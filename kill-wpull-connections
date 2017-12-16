@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+
+if [[ "$1" == '-h' || $# -ne 2 ]]
+then
+	echo 'Usage: kill-wpull-connections (-p PID | -j JOBID | -h)'
+	echo
+	echo ' -h: Display this message and exit'
+	echo ' -j JOBID: Kill connections of the wpull process for ArchiveBot job JOBID'
+	echo ' -p PID: Kill connections of wpull process PID'
+	[[ "$1" == '-h' && $# -eq 1 ]] && exit 0 || exit 1
+fi
+
+if [[ "$1" == '-p' ]]
+then
+	wpullPid=$2
+	if [[ "${wpullPid}" == *[^0-9]* ]]
+	then
+		echo "Error: '${wpullPid}' is not a valid PID"
+		exit 1
+	fi
+elif [[ "$1" == '-j' ]]
+then
+	pids=($(pgrep --full "wpull.*$2"))
+	if [[ ${#pids[@]} -ne 1 ]]
+	then
+		echo "Error: not exactly one process found for '$2'"
+		exit 1
+	fi
+	wpullPid=${pids[0]}
+fi
+
+if ! kill -0 ${wpullPid} >/dev/null 2>&1
+then
+	echo "Error: no process with PID ${wpullPid}"
+	exit 1
+fi
+
+gdb -batch -batch-silent \
+	-ex "attach ${wpullPid}" \
+	-ex 'shell echo "FDs before forced shutdown:"; lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1' \
+	-ex 'python import subprocess' \
+	-ex 'python for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n"): gdb.execute("p shutdown(" + fd + ", 2)")' \
+	-ex 'shell echo "FDs after forced shutdown:"; lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1' \
+	-ex detach \
+	-ex quit
