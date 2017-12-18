@@ -50,9 +50,8 @@ fi
 
 gdb -batch -batch-silent \
 	-ex "attach ${wpullPid}" \
-	-ex 'shell echo "FDs before forced shutdown:"; lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1' \
 	-ex 'python import subprocess' \
-	-ex 'python for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n"): gdb.execute("p shutdown(" + fd + ", 2)")' \
-	-ex 'shell echo "FDs after forced shutdown:"; lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1' \
+	-ex 'python def call(s): return subprocess.call(s, shell = True) == 0' \
+	-ex 'python call("echo '\''FDs before forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1") and ([gdb.execute("p shutdown(" + fd + ", 2)") for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n")] or True) and call("echo '\''FDs after forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1")' \
 	-ex detach \
 	-ex quit
