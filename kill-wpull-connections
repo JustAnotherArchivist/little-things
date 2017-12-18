@@ -22,6 +22,12 @@ then
 elif [[ "$1" == '-j' ]]
 then
 	pids=($(pgrep --full "wpull.*$2"))
+
+	# Filter out this script; this is more complicated than it should be because you can't simply `| grep -v` the PID of this script. When you do that, you create a subshell, which you'd need to filter out as well.
+	# Instead, we convert the list to a string of the form " 1 2 3 ", then replace " PID " by a single space, and finally convert it back to an array for counting the remaining PIDs.
+	pids=" ${pids//$'\n'/ } "
+	pids=(${pids/ $$ / })
+
 	if [[ ${#pids[@]} -ne 1 ]]
 	then
 		echo "Error: not exactly one process found for '$2'"
