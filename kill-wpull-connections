@@ -1,14 +1,25 @@
 #!/bin/bash
 
-if [[ "$1" == '-h' || $# -ne 2 ]]
-then
-	echo 'Usage: kill-wpull-connections (-p PID | -j JOBID | -h)'
+function usage_exit {
+	# usage E -- print usage; exit with status code E
+	echo 'Usage: kill-wpull-connections (-h | [-c] (-p PID | -j JOBID))'
 	echo
 	echo ' -h: Display this message and exit'
-	echo ' -j JOBID: Kill connections of the wpull process for ArchiveBot job JOBID'
+	echo ' -c: Cast return value of shutdown(2) to int explicitly (only necessary on broken machines)'
 	echo ' -p PID: Kill connections of wpull process PID'
-	[[ "$1" == '-h' && $# -eq 1 ]] && exit 0 || exit 1
-fi
+	echo ' -j JOBID: Kill connections of the wpull process for ArchiveBot job JOBID'
+	exit $1
+}
+
+if [[ $# -eq 0 || $# -gt 3 ]]; then usage_exit 1; fi
+if [[ $# -eq 1 && "$1" == '-h' ]]; then usage_exit 0; fi
+if [[ $# -ne 2 && $# -ne 3 ]]; then usage_exit 1; fi
+
+cast=
+if [[ "$1" == '-c' ]]; then cast='(int)'; shift; fi
+
+if [[ "$1" != -[pj] ]]; then usage_exit 1; fi
+if [[ $# -ne 2 ]]; then usage_exit 1; fi
 
 if [[ "$1" == '-p' ]]
 then
@@ -56,6 +67,6 @@ gdb -batch -batch-silent \
 	-ex "attach ${wpullPid}" \
 	-ex 'python import subprocess' \
 	-ex 'python def call(s): return subprocess.call(s, shell = True) == 0' \
-	-ex 'python call("echo '\''FDs before forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1") and ([gdb.execute("p shutdown(" + fd + ", 2)") for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n")] or True) and call("echo '\''FDs after forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1")' \
+	-ex 'python call("echo '\''FDs before forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1") and ([gdb.execute("p '${cast}'shutdown(" + fd + ", 2)") for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n")] or True) and call("echo '\''FDs after forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1")' \
 	-ex detach \
 	-ex quit
