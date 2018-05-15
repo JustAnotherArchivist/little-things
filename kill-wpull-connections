@@ -42,7 +42,7 @@ then
 	exit 1
 fi
 
-if ! kill -0 ${wpullPid} >/dev/null 2>&1
+if ! ps -p ${wpullPid} >/dev/null 2>&1
 then
 	echo "Error: no process with PID ${wpullPid}"
 	exit 1
