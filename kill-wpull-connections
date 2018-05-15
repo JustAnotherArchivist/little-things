@@ -48,6 +48,11 @@ then
 	exit 1
 fi
 
+if [[ -e /proc/sys/kernel/yama/ptrace_scope && "$(< /proc/sys/kernel/yama/ptrace_scope)" != "0" && $EUID -ne 0 ]]
+then
+	echo "Warning: /proc/sys/kernel/yama/ptrace_scope is not zero. You likely need to run this script as root."
+fi
+
 gdb -batch -batch-silent \
 	-ex "attach ${wpullPid}" \
 	-ex 'python import subprocess' \
