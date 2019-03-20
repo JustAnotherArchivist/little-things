@@ -1,0 +1,3 @@
+#!/bin/bash
+# Monitor how the wget processes went recently from pipelines running in tmux windows
+{ for i in {1..6}; do tmux capture-pane -t session:${i} -pS -1000; done; } | grep -P 'WgetDownload' | grep -Po '^(Finished|Failed|Retrying)' | sort | uniq -c
