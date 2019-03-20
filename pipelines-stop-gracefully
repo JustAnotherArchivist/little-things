@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stop all pipelines running on the current machine gracefully
+# DO NOT USE FOR ARCHIVEBOT
+pkill -INT pipeline

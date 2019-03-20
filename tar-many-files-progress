@@ -1,0 +1,3 @@
+#!/bin/bash
+# Tar a directory with many files with a progress report
+time stdbuf -oL tar -cvzf foo.tar.gz directory | awk 'BEGIN{count=0;total=1000000}{count+=1;if (count % 100 == 0) { printf "\r%d of %d done", count, total; fflush(); }}END{printf "\r%d of %d done\n", count, total}'

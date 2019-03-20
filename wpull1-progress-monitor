@@ -1,0 +1,3 @@
+#!/bin/bash
+sqlite3 *.db 'SELECT status, COUNT(id) FROM urls GROUP BY status'
+sqlite3 *.db 'SELECT status_code, COUNT(id) FROM urls GROUP BY status_code'

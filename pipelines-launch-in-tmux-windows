@@ -1,0 +1,3 @@
+#!/bin/bash
+# Launch pipeline instances, each using a different IP and a separate directory, in windows in tmux session 'instances'
+for ip in ...; do tmux new-window -t instances "bash -c 'cd ~/whatever-grab.${ip}; run-pipeline3 pipeline.py --disable-web-server --concurrent 1 --context-value bind_address=${ip} YOURNICKHERE; exec bash'"; done

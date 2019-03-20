@@ -1,0 +1,3 @@
+#!/bin/bash
+# Monitor a grab split up over multiple wpull 1.x processes (e.g. a forum where you split everything up by thread ID)
+sqlite3 < <(declare -i i=0; for f in /paths/to/wpull.db; do echo "ATTACH DATABASE '${f}' AS db${i};"; i+=1; done; declare -i n=i; echo -n "SELECT status, SUM(count) FROM ("; i=0; while [[ ${i} -lt ${n} ]]; do if [[ ${i} -ne 0 ]]; then echo -n "UNION ALL "; fi; echo "SELECT status, COUNT(id) AS count FROM db${i}.urls GROUP BY status "; i+=1; done; echo ") GROUP BY status;")

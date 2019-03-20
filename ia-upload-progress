@@ -1,0 +1,3 @@
+#!/bin/bash
+# Check how much of an upload made it into the item yet (vs. how much is stuck in the S3 queue if you also watch the upload process)
+echo "Uploaded $(ia metadata $identifier | grep -Po '("source"\s*:\s*"original",[^}]*"size"\s*:\s*"\K\d+|"size"\s*:\s*"\K\d+(?="\s*,[^}]*"source"\s*:\s*"original"))' | awk '{sum+=$1} END {printf "%.2f GiB\n",sum/1024/1024/1024}') of $(du -bc *.warc.gz | tail -1 | cut -f1 | awk '{printf "%.2f GiB", $1/1024/1024/1024}')"

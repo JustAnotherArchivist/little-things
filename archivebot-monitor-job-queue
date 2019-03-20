@@ -1,0 +1,5 @@
+#!/bin/bash
+# Micro-optimisation FTW
+# Sometimes, sites have ridiculous rate limits, but there are also a lot of other URLs in the job's queue.
+# This command helps figuring out when the delay needs to be adjusted so that off-site stuff can be processed quickly while the on-site things are retrieved slowly in accordance with the rate limit.
+{ echo 'DIFF POS ID ID PARENT ROOT STATUS TRY LEVEL ILEVEL TYPE PRIO POST SCODE FN ID URL'; sqlite3 wpull.db 'SELECT queued_urls.*, url_strings.* FROM queued_urls JOIN url_strings ON queued_urls.url_string_id = url_strings.id WHERE queued_urls.status = "todo"' | grep -nF '//ridiculouslyratelimitedsite.example.net/' | grep -v -e '/most' -e '\?important' -e '&ignore' -e 'patterns$' | awk -F':' 'BEGIN{prev=0} {print ($1 - prev) " " $0; prev=$1}' | sed 's,:, ,; s,|, ,g'; } | head -1000 | column -nt | less -S

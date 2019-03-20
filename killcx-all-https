@@ -1,0 +1,3 @@
+#!/bin/bash
+# Call killcx for all HTTPS connections established by a process
+lsof -np $pid | grep TCP | grep -Po -- '->\K[^:]+:https?(?= )' | sort | sed 's,:https,:443,; s,:http,:80,' | while read -r con; do echo "=========== ${con}"; ./killcx "${con}"; done

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Upload something to FOS via FTP
+{ echo 'user username password'; echo 'cd directory'; echo 'mput something-00???.warc.gz'; } | ftp -ni fos.textfiles.com

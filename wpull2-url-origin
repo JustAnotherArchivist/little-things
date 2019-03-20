@@ -1,0 +1,3 @@
+#!/bin/bash
+# Trace back where a URL was discovered, all the way back to the root
+url="$1"; curId=$(sqlite3 wpull.db 'SELECT id FROM url_strings WHERE url = "'"${url}"'"'); while :; do sqlite3 wpull.db 'SELECT queued_urls.*, url_strings.* FROM queued_urls JOIN url_strings ON queued_urls.url_string_id = url_strings.id WHERE url_strings.id = '$curId; if [[ $curId -eq 1 ]]; then break; fi; curId=$(sqlite3 wpull.db 'SELECT parent_url_string_id FROM queued_urls WHERE url_string_id = '$curId); done

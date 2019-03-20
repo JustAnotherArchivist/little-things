@@ -1,0 +1,3 @@
+#!/bin/bash
+# Run a command every full five minutes in a terminal window
+while :; do date; "$@"; echo; sleep $(echo "(5 - $(date '+%M') % 5) * 60 - $(date +'%S.%N')" | bc); done

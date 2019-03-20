@@ -1,0 +1,5 @@
+#!/bin/bash
+# Estimate size of a website through wget spider
+# Note: this will miss anything where the server doesn't advertise the size.
+wget --recursive --level inf --spider --no-directories --output-file=wget.log --no-parent --reject-regex '/\?C=[NMSD];O=[AD]$' "$1"
+grep -Po '  \Khttps?://.*$|Length: \K\d+(?= )' wget.log | sed 's,^\(.*https\?://.*$\),url \1,; s,^\([0-9]\+\)$,length \1,' | awk 'BEGIN {url = ""; len = 0; totalsize = 0; }  { if ($1 == "url") { if ($2 != url) { totalsize += len; url = $2; len = 0; } } else { if ($1 == "length") { len = $2; } } }  END { totalsize += len; printf "%.0f\n", totalsize; }'

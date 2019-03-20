@@ -1,0 +1,4 @@
+#!/bin/bash
+# Generate a list of relevant crx4chrome.com URLs for an extension (e.g. for feeding it into ArchiveBot)
+# Call passing the URL to an extension page, e.g. https://www.crx4chrome.com/extensions/eebpioaailbjojmdbmlpomfgijnlcemk/
+url="$1"; echo "${url}"; historyUrl="https://www.crx4chrome.com$(curl -s "${url}" | grep -Po 'href="\K/history/[^"]+' | uniq)"; if [[ $(wc -l <<<"${historyUrl}") -ne 1 ]]; then echo "Not exactly one history URL" >&2; return; fi; echo "${historyUrl}"; curl -s "${historyUrl}" | tr -d '\n' | grep -Po '<ol class="history">.*?</ol>' | grep -Po 'href="\K/crx/[^"]+' | while read -r versionUrl; do versionUrl="https://www.crx4chrome.com${versionUrl}"; echo "${versionUrl}"; curl -s "${versionUrl}" | grep -Po 'href="\Khttps://www.crx4chrome.com/go.php\?[^"]+' | while read -r downloadUrl; do echo "${downloadUrl}"; grep -Po '[?&]l=\K[^&]+' <<< "${downloadUrl}" | perl -pe 's/\%(\w\w)/chr hex $1/ge'; done; done;
