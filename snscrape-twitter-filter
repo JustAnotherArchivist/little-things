@@ -1,0 +1,9 @@
+#!/bin/bash
+# When scraping accounts and hashtags which have some overlap, this can be used to filter out the accounts' tweets from the hashtag scrapes
+# Starting with account and hashtag scrapes in twitter-@* and twitter-#*, respectively:
+for f in twitter-#*; do comm -23 <(sort <$f) <(cat twitter-@* | sort) > "${f}-fixed"; done
+for f in *-fixed; do { grep -vF '/status/' $f; grep -F '/status/' $f | sort -t'/' -k6,6n | tac; } > "${f}-sorted"; done
+for f in *-fixed-sorted; do mv $f ${f/-fixed-sorted/-filtered}; done
+
+# sort -r should work, but for some reason it doesn't, hence the tac...
+# There's certainly a cleaner way which doesn't involve sorting and then restoring the inverse chronological order.
