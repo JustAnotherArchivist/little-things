@@ -1,0 +1,2 @@
+#!/bin/bash
+hashtag="$1"; { echo "https://twitter.com/hashtag/${hashtag}"; echo "https://twitter.com/hashtag/${hashtag}?src=hash"; echo "https://twitter.com/hashtag/${hashtag}?f=tweets&vertical=default"; echo "https://twitter.com/hashtag/${hashtag}?f=tweets&vertical=default&src=hash"; snscrape -v twitter-hashtag "${hashtag}"; } > "twitter-#${hashtag}"

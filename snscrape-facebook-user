@@ -1,0 +1,2 @@
+#!/bin/bash
+user="$1"; { echo "https://www.facebook.com/${user}/"; snscrape -v facebook-user "${user}" | perl -pe 's,[?&]\K__xts__%5B0%5D=[^&]+?(&|$),,; s,[?&]\K__tn__=[^&]+?(&|$),,; s,[?&]\Keid=[^&]+?(&|$),,; s,[?&]$,,;' | awk '{print} /\?type=/ {print substr($0, 1, index($0, "?type=") - 1)}' | awk '!seen[$0]++'; } > "facebook-@${user}"

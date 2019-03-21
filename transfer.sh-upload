@@ -1,0 +1,2 @@
+#!/bin/bash
+curl -s --upload-file "$1" https://transfer.sh/ | sed 's,#,%23,g'; echo

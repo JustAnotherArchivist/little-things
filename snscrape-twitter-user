@@ -1,0 +1,2 @@
+#!/bin/bash
+user="$1"; { echo "https://twitter.com/${user}"; snscrape -v twitter-user "${user}"; } > "twitter-@${user}"
