@@ -1,31 +1,36 @@
 #!/bin/bash
 # Search 4chan archives based on FoolFuuka
-# Searches each board individually to get as much content as possible due to the 5000 results limit
-# Output: one post per line in HTML
+# Output: one post per line in HTML, prefixed with the post ID
+#  Note that posts can appear multiple times in the output in some cases. You're encouraged to filter based on the post ID.
 domain="$1"
 q="$2"
-curl -s "https://${domain}/" | grep -Po 'href="(https?://'"$(sed 's/[]\.|$(){}?+*^]/\\&/g' <<<"${domain}")"')?/\K[^/]+(?=/")' | awk '!seen[$0]++' | while read -r board
+end=
+nextend=2038-01-19
+while :
 do
-	content=$(curl -s "https://${domain}/${board}/search/text/${q}/")
-	if grep -qP '<h3 class="section_title">.*Returning only' <<<"${content}"
-	then
-		echo "Warning: only 5000 results!" >&2
-	fi
+	end="${nextend}"
+	content=$(curl -s "https://${domain}/_/search/text/${q}/end/${end}/page/${page}/")
 
 	declare -i page=1
 	while [[ ${page} -lt 201 ]]
 	do
-		echo "Grabbing https://${domain}/${board}/search/text/${q}/page/${page}/" >&2
-		content=$(curl -s "https://${domain}/${board}/search/text/${q}/page/${page}/")
+		echo "Grabbing https://${domain}/_/search/text/${q}/end/${end}/page/${page}/" >&2
+		content=$(curl -s "https://${domain}/_/search/text/${q}/end/${end}/page/${page}/")
+		tr -d '\n' <<<"${content}" | grep -Po '<article class="post.*?</article>' | perl -pe 's,^(.*?id="(\d+)".*$),\2 \1,'
+
+		# Get last date seen to update end date; subtract one because the search appears to be a bit unreliable
+		nextend="$(date --date="@$(($(date --date="$(tr -d '\n' <<<"${content}" | grep -Po '<article class="post.*?</article>' | tail -1 | grep -Po '<time datetime="\K[^"]+')" '+%s') - 86400))" '+%Y-%m-%d')"
+
 		if grep -qF '<div class="alert"' <<<"${content}"
 		then
 			if ! tr -d '\n' <<<"${content}" | grep -Po '<div class="alert".*?</div>' | grep -q 'No results found'
 			then
-				echo "Error on https://${domain}/${board}/search/text/${q}/page/${page}/" >&2
+				echo "Error" >&2
+				break
+			else
+				break 2
 			fi
-			break
 		fi
-		tr -d '\n' <<<"${content}" | grep -Po '<article class="post.*?</article>'
 		page+=1
 	done
 done
