@@ -1,0 +1,28 @@
+#!/bin/bash
+# Search all submissions or comments on Reddit for a search term
+# Usage: $0 (submission|comment) QUERY
+# Output:
+# For submissions: post date timestamp, permalink, url or None if it's a selfpost, body in Python-repr format or None if it's a title-only selfpost
+# For comments: post date timestamp, permalink, content in Python-repr format
+#   For comments before 2017-10-24, the Pushshift API doesn't provide a permalink, so that field is filled with "comment_id/parent_id/username" instead.
+#   Unfortunately, that means that it may be hard to find those comments on Reddit (unless the parent is a thread, i.e. it's a top-level comment).
+mode="$1"
+q="$2"
+before=2147483647
+pipe=$(mktemp -u); mkfifo "${pipe}"; exec 3<>"${pipe}"; rm "${pipe}"; unset pipe
+while :
+do
+	{
+		if [[ "${mode}" == "comment" ]]
+		then
+			curl -s "https://api.pushshift.io/reddit/search/comment/?q=${q}&size=500&fields=author,body,created_utc,link_id,parent_id,permalink&before=${before}" | python3 -c 'import json,sys'$'\n''for d in json.loads(sys.stdin.read())["data"]:'$'\n'' print("%d %s %r" % (d["created_utc"], d["permalink"] if "permalink" in d else d["parent_id"] + "/" + d["link_id"] + "/" + d["author"], d["body"]))'
+		else
+			curl -s "https://api.pushshift.io/reddit/search/submission/?q=${q}&size=500&fields=author,created_utc,id,is_self,permalink,selftext,url&before=${before}" | python3 -c 'import json,sys'$'\n''for d in json.loads(sys.stdin.read())["data"]:'$'\n'' print("%d %s %s %s" % (d["created_utc"], d["permalink"], d["url"] if not d["is_self"] else "None", repr(d["selftext"]) if "selftext" in d else "None"))'
+		fi
+	} | awk 'BEGIN { timestamp = 0; }  { timestamp=$1; print; }  END { print timestamp >"/dev/fd/3" }'
+	before=$(head -1 <&3)
+	if [[ ${before} -eq 0 ]] # No data returned by Pushshift
+	then
+		break
+	fi
+done

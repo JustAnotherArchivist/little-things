@@ -1,0 +1,16 @@
+#!/bin/bash
+q="$1"
+declare -i max=10000
+if [[ $# -eq 2 ]]; then max=$2; fi
+{
+	declare -i first=1
+	queryStr="q=${q}"
+	while [[ ${first} -lt ${max} ]]
+	do
+		echo "http://www.bing.com/search?${queryStr}" >&2
+		curl -s -A 'Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0' "http://www.bing.com/search?${queryStr}"
+		first+=10
+		queryStr="q=${q}&go=Search&qs=ds&first=${first}&FORM=PORE"
+		sleep 2
+	done
+} | grep -Po '<li class="b_algo">.*?</li>' | grep -Po 'href="\Khttps?://(?!www\.microsofttranslator\.com/|view\.officeapps\.live\.com/)[^"]+' | awk '!seen[$0]++'
