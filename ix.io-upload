@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "$(curl -sF "f:1=@${1}" http://ix.io/)+/${1}" | sed 's,#,%23,g'
