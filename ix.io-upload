@@ -1,2 +1,5 @@
 #!/bin/bash
-echo "$(curl -sF "f:1=@${1}" http://ix.io/)+/${1}" | sed 's,#,%23,g'
+localfile="$1"
+remotefile="${2:-${1}}"
+remotefile="${remotefile##*/}"
+echo "$(curl -sF "f:1=@${localfile}" http://ix.io/)+/${remotefile}" | sed 's,#,%23,g'
