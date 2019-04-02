@@ -1,2 +1,0 @@
-#!/bin/bash
-curl -s "https://www.facebook.com/${1}/" | grep -Po '<meta property="og:url" content="https://www\.facebook\.com/\K[^"/]+'

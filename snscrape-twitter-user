@@ -1,2 +1,11 @@
 #!/bin/bash
-user="$1"; { echo "https://twitter.com/${user}"; snscrape -v twitter-user "${user}"; } > "twitter-@${user}"
+origUser="$1"
+user="$(snscrape --max-results 1 twitter-user "${origUser}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
+if [[ "${user}" ]]
+then
+	if [[ "${user}" != "${origUser}" ]]; then echo "Username fix: ${origUser} -> ${user}" >&2; fi
+	{
+		echo "https://twitter.com/${user}"
+		snscrape -v twitter-user "${user}"
+	} > "twitter-@${user}"
+fi
