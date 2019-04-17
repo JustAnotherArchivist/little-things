@@ -1,2 +1,0 @@
-#!/bin/bash
-curl -s --upload-file "$1" https://transfer.kiska.pw/ | sed 's,#,%23,g'; echo
