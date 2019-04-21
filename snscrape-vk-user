@@ -1,0 +1,2 @@
+#!/bin/bash
+user="${1,,}"; { echo "https://vk.com/${user}"; snscrape -v vkontakte-user "${user}"; } > "vk-@${user}"
