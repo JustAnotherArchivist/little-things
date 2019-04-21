@@ -1,2 +1,2 @@
 #!/bin/bash
-user="$1"; { echo "https://www.instagram.com/${user}/"; snscrape -v --format '{dirtyUrl}' instagram-user "${user}"; } > "instagram-@${user}"
+user="${1,,}"; { echo "https://www.instagram.com/${user}/"; snscrape -v --format '{dirtyUrl}' instagram-user "${user}"; } > "instagram-@${user}"
