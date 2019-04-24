@@ -1,2 +1,2 @@
 #!/bin/bash
-curl -s --upload-file "$1" https://transfer.notkiska.pw/ | sed 's,#,%23,g'; echo
+curl -s --upload-file "$1" https://transfer.notkiska.pw/; echo
