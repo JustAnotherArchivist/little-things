@@ -1,0 +1,49 @@
+#!/bin/bash
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+
+insta=
+
+if [[ -e transfer ]]
+then
+	echo "Error: ./transfer exists" >&2
+	exit 1
+fi
+
+# ArchiveBot
+for f in "$@"
+do
+	upurl="$("${scriptpath}/transfer.notkiska.pw-upload" "${f}")"
+	echo "${upurl}" >&3
+	if [[ "${f}" == facebook-* ]]
+	then
+		echo "!ao < ${upurl}"
+	elif [[ "${f}" == twitter-* ]]
+	then
+		echo "!ao < ${upurl} --concurrency 6 --delay 0"
+	elif [[ "${f}" == instagram-* ]]
+	then
+		echo "!a < ${upurl}"
+		insta=1
+	else
+		echo "!ao < ${upurl}"
+	fi
+done 3>transfer
+
+# chromebot
+for f in "$@"
+do
+	if [[ "${f}" == facebook-@* || "${f}" == twitter-@* ]]
+	then
+		head -1 "${f}"
+	elif [[ "${f}" == twitter-#* ]]
+	then
+		head -4 "${f}"
+	fi
+done | sed 's,^,chromebot: a ,'
+
+# Instagram ignore warning
+if [[ "${insta}" ]]
+then
+	echo "Don't forget to add the Instagram ignore! ^https?://www.instagram.com/.*[?&]hl=" >&2
+fi
+echo "Wrote ./transfer, you can run snscrape-wiki-transfer-merge now if ./wiki exists." >&2

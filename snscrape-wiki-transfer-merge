@@ -1,0 +1,34 @@
+#!/bin/bash
+if [[ ! -e wiki || ! -e transfer ]]
+then
+	echo "Error: ./wiki or ./transfer missing"
+	exit 1
+fi
+
+while read -r line
+do
+	if [[ "${line}" == *facebook* ]]
+	then
+		l="${line%/}"
+		search="facebook.*${l##*/}"
+	elif [[ "${line}" == *twitter* ]]
+	then
+		search="twitter.*${line##*/}"
+	elif [[ "${line}" == *instagram* ]]
+	then
+		l="${line%/}"
+		search="instagram.*${l##*/}"
+	else
+		search=
+	fi
+
+	if [[ "${search}" ]]
+	then
+		if grep -q "${search}" transfer
+		then
+			echo "$(grep "${search}" transfer) | note = ${line}"
+			continue
+		fi
+	fi
+	echo "${line}"
+done <wiki
