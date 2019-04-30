@@ -269,26 +269,35 @@ class ColourMode(ProcessMode):
 	def _replace_esc(self, data):
 		return data.replace(b'\x1b', COLOURS.INVERTED + b'ESC' + COLOURS.RESET)
 
-	def _print_line(self, line, colour, withLF = True):
-		sys.stdout.buffer.write(colour)
-		sys.stdout.buffer.write(self._replace_esc(line))
-		sys.stdout.buffer.write(COLOURS.RESET)
+	def _print_line(self, line, colour, withLF = True, colourOnlyBeforeColon = False):
+		if colourOnlyBeforeColon:
+			if b':' in line:
+				offset = line.index(b':')
+			else:
+				offset = 0
+		else:
+			offset = len(line)
+		if offset > 0:
+			sys.stdout.buffer.write(colour)
+			sys.stdout.buffer.write(self._replace_esc(line[:offset]))
+			sys.stdout.buffer.write(COLOURS.RESET)
+		sys.stdout.buffer.write(line[offset:])
 		if withLF:
 			sys.stdout.buffer.write(b'\n')
 
-	def _print_data(self, data, colour):
+	def _print_data(self, data, colour, colourOnlyBeforeColon):
 		later = False
 		for line in data.split(b'\r\n'):
 			if later:
 				sys.stdout.buffer.write(b'\n')
-			self._print_line(line, colour, withLF = False)
+			self._print_line(line, colour, withLF = False, colourOnlyBeforeColon = colourOnlyBeforeColon)
 			later = True
 
 	def process_event(self, event):
 		if type(event) is BeginOfRecord:
 			firstNewline = event.rawData.index(b'\r\n')
 			self._print_line(event.rawData[:firstNewline], COLOURS.LIGHTGREEN)
-			self._print_data(event.rawData[firstNewline + 2:], COLOURS.GREEN)
+			self._print_data(event.rawData[firstNewline + 2:], COLOURS.GREEN, True)
 			sys.stdout.buffer.write(b'\n\n') # separator between header and block
 			self._hadHttpStatusLine = False
 		elif type(event) is WARCBlockChunk:
@@ -300,9 +309,9 @@ class ColourMode(ProcessMode):
 					self._hadHttpStatusLine = True
 				else:
 					offset = 0
-				self._print_data(event.data[offset:], COLOURS.PURPLE)
+				self._print_data(event.data[offset:], COLOURS.PURPLE, True)
 			elif event.isHttpHeader is False:
-				self._print_data(event.data, COLOURS.RED)
+				self._print_data(event.data, COLOURS.RED, False)
 			elif event.isHttpHeader is None:
 				sys.stdout.buffer.write(self._replace_esc(event.data))
 		elif type(event) is EndOfRecord:
