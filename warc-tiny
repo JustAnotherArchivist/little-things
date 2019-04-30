@@ -80,6 +80,8 @@ def iter_warc(f):
 					buf = buf + fp.read(4096)
 				except EOFError:
 					break
+				if not buf:
+					break
 			if not buf:
 				break
 			warcHeaderBuf, buf = buf.split(b'\r\n\r\n', 1)
