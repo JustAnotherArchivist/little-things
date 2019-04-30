@@ -188,6 +188,27 @@ class ProcessMode:
 		raise NotImplementedError
 
 
+class Digest:
+	def __init__(self, digest):
+		self._digest = digest
+
+	def format(self, digest = None):
+		raise NotImplementedError
+
+	def equals(self, digest):
+		return self._digest == digest
+
+
+class Base32Digest(Digest):
+	def format(self, digest = None):
+		return base64.b32encode(digest if digest else self._digest)
+
+
+class HexDigest(Digest):
+	def format(self, digest = None):
+		return (digest if digest else self._digest).hex()
+
+
 class VerifyMode(ProcessMode):
 	def __init__(self):
 		self._blockDigester = None
@@ -197,20 +218,30 @@ class VerifyMode(ProcessMode):
 		self._recordedPayloadDigest = None
 		self._printedBrokenPayloadWarning = False
 
+	def parse_digest(self, digest):
+		if not digest.startswith(b'sha1:'):
+			print('Warning: don\'t understand hash format: {!r}'.format(digest), file = sys.stderr)
+			return None
+		if len(digest) == 37 and digest.rstrip(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567') == b'sha1:': # 5 for 'sha1:' + 32 for base-32 hash
+			return Base32Digest(base64.b32decode(digest[5:]))
+		if len(digest) == 45 and digest.rstrip(b'0123456789abcdef') == b'sha1:':
+			return HexDigest(bytes.fromhex(digest[5:].decode('ascii')))
+		return None
+
 	def process_event(self, event):
 		if type(event) is NewFile:
 			self._printedBrokenPayloadWarning = False
 		elif type(event) is BeginOfRecord:
 			if any(x[0] == b'WARC-Block-Digest' for x in event.warcHeaders):
 				self._blockDigester = hashlib.sha1()
-				self._recordedBlockDigest = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Block-Digest')
+				self._recordedBlockDigest = self.parse_digest(next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Block-Digest'))
 			else:
 				self._blockDigester = None
 				self._recordedBlockDigest = None
 			if any(x[0] == b'WARC-Payload-Digest' for x in event.warcHeaders):
 				self._payloadDigester = hashlib.sha1()
 				self._brokenPayloadDigester = hashlib.sha1()
-				self._recordedPayloadDigest = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Payload-Digest')
+				self._recordedPayloadDigest = self.parse_digest(next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Payload-Digest'))
 			else:
 				self._payloadDigester = None
 				self._brokenPayloadDigester = None
@@ -227,17 +258,17 @@ class VerifyMode(ProcessMode):
 			if self._brokenPayloadDigester:
 				self._brokenPayloadDigester.update(event.data)
 		elif type(event) is EndOfRecord:
-			if self._blockDigester:
-				if self._recordedBlockDigest != b'sha1:' + base64.b32encode(self._blockDigester.digest()):
-					print('Block digest mismatch for record {}: recorded {} v calculated {}'.format(self._recordID, self._recordedBlockDigest, base64.b32encode(self._blockDigester.digest())))
+			if self._blockDigester and self._recordedBlockDigest:
+				if not self._recordedBlockDigest.equals(self._blockDigester.digest()):
+					print('Block digest mismatch for record {}: recorded {} v calculated {}'.format(self._recordID, self._recordedBlockDigest.format(), self._recordedBlockDigest.format(self._blockDigester.digest())))
 			if self._payloadDigester and self._recordType in (b'request', b'response'): #TODO: Support revisit
-				if self._recordedPayloadDigest != b'sha1:' + base64.b32encode(self._payloadDigester.digest()):
-					if self._recordedPayloadDigest == b'sha1:' + base64.b32encode(self._brokenPayloadDigester.digest()):
+				if not self._recordedPayloadDigest.equals(self._payloadDigester.digest()):
+					if self._recordedPayloadDigest.equals(self._brokenPayloadDigester.digest()):
 						if not self._printedBrokenPayloadWarning:
 							print('Warning: WARC uses incorrect payload digests without stripping the transfer encoding')
 							self._printedBrokenPayloadWarning = True
 					else:
-						print('Payload digest mismatch for record {}: recorded {} vs. calculated {} (calculated broken {})'.format(self._recordID, self._recordedPayloadDigest, base64.b32encode(self._payloadDigester.digest()), base64.b32encode(self._brokenPayloadDigester.digest())))
+						print('Payload digest mismatch for record {}: recorded {} vs. calculated {} (calculated broken {})'.format(self._recordID, self._recordedPayloadDigest.format(), self._recordedPayloadDigest.format(self._payloadDigester.digest()), self._recordedPayloadDigest.format(self._brokenPayloadDigester.digest())))
 
 
 class DumpResponsesMode(ProcessMode):
