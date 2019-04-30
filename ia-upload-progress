@@ -1,3 +1,16 @@
 #!/bin/bash
 # Check how much of an upload made it into the item yet (vs. how much is stuck in the S3 queue if you also watch the upload process)
-echo "Uploaded $(ia metadata $identifier | grep -Po '("source"\s*:\s*"original",[^}]*"size"\s*:\s*"\K\d+|"size"\s*:\s*"\K\d+(?="\s*,[^}]*"source"\s*:\s*"original"))' | awk '{sum+=$1} END {printf "%.2f GiB\n",sum/1024/1024/1024}') of $(du -bc *.warc.gz | tail -1 | cut -f1 | awk '{printf "%.2f GiB", $1/1024/1024/1024}')"
+# Usage: ia-upload-progress IA_IDENTIFIER [FILES]
+# If no files are specified, all WARCs in the current directory are used.
+identifier=$1
+shift
+files=("$@")
+if [[ ${#files[@]} -eq 0 ]]
+then
+	files=(*.warc.gz)
+fi
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+
+uploaded=$(ia metadata "${identifier}" | grep -Po '("source"\s*:\s*"original",[^}]*"size"\s*:\s*"\K\d+|"size"\s*:\s*"\K\d+(?="\s*,[^}]*"source"\s*:\s*"original"))' | awk '{sum+=$1} END {printf "%.0f\n", sum}')
+localSize=$(du -bc "${files[@]}" | tail -1 | cut -f1)
+echo "Uploaded $("${scriptpath}/format-size" <<<"${uploaded}") of $("${scriptpath}/format-size" <<<"${localSize}") ($(awk '{ printf "%.1f", 100 * ($1 / $2); }' <<<"${uploaded} ${localSize}") %)"
