@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-# Tiny tool for WARC stuff. Currently has two modes: verifying the integrity of a WARC by comparing the digests and dumping the HTTP response bodies to stdout.
+# Tiny tool for WARC stuff.
+# Operating modes:
+#  warc-tiny colour FILES  --  coloured output of the WARCs for easier reading
+#  warc-tiny dump-responses FILES  --  dump the HTTP response bodies to stdout
+#  warc-tiny verify FILES  --  verify the integrity of a WARC by comparing the digests
 
 import base64
 import gzip
