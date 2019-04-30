@@ -248,8 +248,64 @@ class DumpResponsesMode(ProcessMode):
 				sys.stdout.buffer.write(b'\r\n')
 
 
+class COLOURS:
+	RESET = b'\x1b[0m'
+	GREEN = b'\x1b[0;32m'
+	LIGHTGREEN = b'\x1b[1;32m'
+	PURPLE = b'\x1b[0;35m'
+	LIGHTPURPLE = b'\x1b[1;35m'
+	RED = b'\x1b[0;31m'
+	INVERTED = b'\x1b[7m'
+
+
+class ColourMode(ProcessMode):
+	def __init__(self):
+		self._hadHttpStatusLine = False
+
+	def _replace_esc(self, data):
+		return data.replace(b'\x1b', COLOURS.INVERTED + b'ESC' + COLOURS.RESET)
+
+	def _print_line(self, line, colour, withLF = True):
+		sys.stdout.buffer.write(colour)
+		sys.stdout.buffer.write(self._replace_esc(line))
+		sys.stdout.buffer.write(COLOURS.RESET)
+		if withLF:
+			sys.stdout.buffer.write(b'\n')
+
+	def _print_data(self, data, colour):
+		later = False
+		for line in data.split(b'\r\n'):
+			if later:
+				sys.stdout.buffer.write(b'\n')
+			self._print_line(line, colour, withLF = False)
+			later = True
+
+	def process_event(self, event):
+		if type(event) is BeginOfRecord:
+			firstNewline = event.rawData.index(b'\r\n')
+			self._print_line(event.rawData[:firstNewline], COLOURS.LIGHTGREEN)
+			self._print_data(event.rawData[firstNewline + 2:], COLOURS.GREEN)
+			sys.stdout.buffer.write(b'\n\n') # separator between header and block
+			self._hadHttpStatusLine = False
+		elif type(event) is WARCBlockChunk:
+			if event.isHttpHeader is True:
+				if not self._hadHttpStatusLine:
+					firstNewline = event.data.index(b'\r\n')
+					self._print_line(event.data[:firstNewline], COLOURS.LIGHTPURPLE)
+					offset = firstNewline + 2
+					self._hadHttpStatusLine = True
+				else:
+					offset = 0
+				self._print_data(event.data[offset:], COLOURS.PURPLE)
+			elif event.isHttpHeader is False:
+				self._print_data(event.data, COLOURS.RED)
+			elif event.isHttpHeader is None:
+				sys.stdout.buffer.write(self._replace_esc(event.data))
+		elif type(event) is EndOfRecord:
+			sys.stdout.buffer.write(b'\n\n')
+
 def main():
-	processorMap = {'verify': VerifyMode, 'dump-responses': DumpResponsesMode}
+	processorMap = {'verify': VerifyMode, 'dump-responses': DumpResponsesMode, 'colour': ColourMode}
 
 	assert len(sys.argv) - 1 >= 2
 	mode = sys.argv[1]
