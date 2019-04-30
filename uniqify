@@ -1,0 +1,13 @@
+#!/bin/bash
+if [[ "$1" != "-c" ]]
+then
+	# Without count (preserving order, printing the first appearance)
+	# In this case, Perl is *much* faster than AWK.
+	perl -ne 'print if ! $a{$_}++'
+	#awk '!seen[$0]++'
+else
+	# With count (order undefined)
+	# Here, AWK is significantly faster.
+	#perl -e 'while (<>) { $a{$_}++; } foreach $key (keys %a) { print "$a{$key} $key"; }'
+	awk '{ tot[$0]++ } END { for (i in tot) print tot[i],i }'
+fi
