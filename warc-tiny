@@ -27,12 +27,17 @@ class NewFile(Event):
 
 
 class BeginOfRecord(Event):
-	def __init__(self, warcHeaders):
+	def __init__(self, warcHeaders, rawData):
 		self._warcHeaders = warcHeaders
+		self._rawData = rawData
 
 	@property
 	def warcHeaders(self):
 		return self._warcHeaders
+
+	@property
+	def rawData(self):
+		return self._rawData
 
 
 class _DataChunk(Event):
@@ -48,7 +53,14 @@ class _DataChunk(Event):
 
 
 class WARCBlockChunk(_DataChunk):
-	pass
+	def __init__(self, data, isHttpHeader = None):
+		super().__init__(data)
+		self._isHttpHeader = isHttpHeader
+
+	@property
+	def isHttpHeader(self):
+		# True: the chunk represents (part of) the HTTP header; False: the chunk represents (part of) the HTTP body; None: the chunk is not part of an HTTP record
+		return self._isHttpHeader
 
 
 class RawHTTPResponseBodyChunk(_DataChunk):
@@ -70,6 +82,7 @@ class EndOfRecord(Event):
 
 def iter_warc(f):
 	# Yields Events
+	# BeginOfRecord's rawData does not include the CRLF CRLF at the end of the headers, and WARCBlockChunk does not contain the CRLF CRLF after the block either.
 
 	with gzip.open(f, 'rb') as fp:
 		buf = b''
@@ -91,7 +104,7 @@ def iter_warc(f):
 			warcContentType = next(x[1] for x in warcHeaders if x[0] == b'Content-Type')
 			warcContentLength = int(next(x[1] for x in warcHeaders if x[0] == b'Content-Length'))
 			warcType = next(x[1] for x in warcHeaders if x[0] == b'WARC-Type')
-			yield BeginOfRecord(warcHeaders)
+			yield BeginOfRecord(warcHeaders, warcHeaderBuf)
 
 			# Read WARC block (and skip CRLFCRLF at the end of the record)
 			if len(buf) < warcContentLength + 4:
@@ -105,10 +118,14 @@ def iter_warc(f):
 			warcContent = buf[:warcContentLength]
 			buf = buf[warcContentLength + 4:]
 
-			yield WARCBlockChunk(warcContent)
-
 			# Decode HTTP response if it is one
-			if warcContentType in (b'application/http;msgtype=response', b'application/http; msgtype=response') and warcType in (b'request', b'response'): #TODO: Support revisit
+			if warcContentType in (b'application/http;msgtype=request', b'application/http; msgtype=request') and warcType == b'request':
+				httpType = 'request'
+			elif warcContentType in (b'application/http;msgtype=response', b'application/http; msgtype=response') and warcType == b'response':
+				httpType = 'response'
+			else:
+				httpType = None
+			if httpType is not None:
 				if b'\r\n\r\n' in warcContent:
 					httpHeaders, httpBody = warcContent.split(b'\r\n\r\n', 1)
 
@@ -122,38 +139,43 @@ def iter_warc(f):
 						chunked = b'chunked' in transferEncodings
 						gzipped = b'gzip' in transferEncodings
 
+					yield WARCBlockChunk(httpHeaders + b'\r\n\r\n', isHttpHeader = True)
+					yield WARCBlockChunk(httpBody, isHttpHeader = False)
 					yield RawHTTPResponseBodyChunk(httpBody)
 
-					# Decode body
-					if gzipped:
-						httpDecompressor = GzipDecompressor()
-					else:
-						httpDecompressor = DummyDecompressor()
-					if chunked:
-						while True:
-							try:
-								chunkLineEnd = httpBody.index(b'\r\n')
-							except ValueError:
-								print('Error: could not find chunk line end, skipping', file = sys.stderr)
-								break
-							chunkLine = httpBody[:chunkLineEnd]
-							if b';' in chunkLine:
-								chunkLength = chunkLine[:chunkLine.index(b';')].strip()
-							else:
-								chunkLength = chunkLine.strip()
-							if chunkLength.lstrip(b'0123456789abcdef') != b'':
-								print('Error: malformed chunk length, skipping', file = sys.stderr)
-								break
-							chunkLength = int(chunkLength, base = 16)
-							if chunkLength == 0:
-								break
-							chunk = httpDecompressor.decompress(httpBody[chunkLineEnd + 2 : chunkLineEnd + 2 + chunkLength])
-							yield HTTPResponseBodyChunk(chunk)
-							httpBody = httpBody[chunkLineEnd + 2 + chunkLength + 2:]
-					else:
-						yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody)[:50])
+					if httpType == 'response':
+						# Decode body
+						if gzipped:
+							httpDecompressor = GzipDecompressor()
+						else:
+							httpDecompressor = DummyDecompressor()
+						if chunked:
+							while True:
+								try:
+									chunkLineEnd = httpBody.index(b'\r\n')
+								except ValueError:
+									print('Error: could not find chunk line end, skipping', file = sys.stderr)
+									break
+								chunkLine = httpBody[:chunkLineEnd]
+								if b';' in chunkLine:
+									chunkLength = chunkLine[:chunkLine.index(b';')].strip()
+								else:
+									chunkLength = chunkLine.strip()
+								if chunkLength.lstrip(b'0123456789abcdef') != b'':
+									print('Error: malformed chunk length, skipping', file = sys.stderr)
+									break
+								chunkLength = int(chunkLength, base = 16)
+								if chunkLength == 0:
+									break
+								chunk = httpDecompressor.decompress(httpBody[chunkLineEnd + 2 : chunkLineEnd + 2 + chunkLength])
+								yield HTTPResponseBodyChunk(chunk)
+								httpBody = httpBody[chunkLineEnd + 2 + chunkLength + 2:]
+						else:
+							yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody)[:50])
 				else:
 					print('Warning: malformed HTTP response, skipping', file = sys.stderr)
+			else:
+				yield WARCBlockChunk(warcContent)
 			yield EndOfRecord()
 
 
