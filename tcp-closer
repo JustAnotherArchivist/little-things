@@ -1,0 +1,1 @@
+sudo tcp-closer --dport 443 --idle_time 21601000 --last_recv_limit 43200000 --interval 300
