@@ -1,0 +1,42 @@
+#!/bin/bash
+# Read a list of URLs from stdin, replace suitable social media URLs with correctly capitalised version
+errorUrls=()
+while read -r url
+do
+	if [[ "${url}" =~ ^https?://(www|m|[a-z][a-z]-[a-z][a-z]).facebook.com/[^/]+/?$ ]]
+	then
+		user="$(curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36' -H 'Accept-Language: en-US,en;q=0.5' "https://www.${url#*.}" | grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
+		if [[ "${user}" ]]
+		then
+			echo "https://www.facebook.com/${user}/"
+		else
+			errorUrls+=("${url}")
+			echo "${url}"
+		fi
+	elif [[ "${url}" =~ ^https?://twitter\.com/[^/]+$ ]]
+	then
+		user="$(snscrape --max-results 1 twitter-user "${url##*/}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
+		if [[ "${user}" ]]
+		then
+			echo "https://twitter.com/${user}"
+		else
+			errorUrls+=("${url}")
+			echo "${url}"
+		fi
+	elif [[ "${url}" =~ ^https?://www\.instagram\.com/[^/]+/$ ]]
+	then
+		echo "${url,,}"
+	else
+		echo "${url}"
+	fi
+done
+
+if [[ ${#errorUrls[@]} -gt 0 ]]
+then
+	echo "" >&2
+	echo "Failed to process URLs:" >&2
+	for errorUrl in "${errorUrls[@]}"
+	do
+		echo "${errorUrl}" >&2
+	done
+fi
