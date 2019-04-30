@@ -218,11 +218,14 @@ class VerifyMode(ProcessMode):
 			self._recordID = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Record-ID')
 			self._recordType = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Type')
 		elif type(event) is WARCBlockChunk:
-			self._blockDigester.update(event.data)
+			if self._blockDigester:
+				self._blockDigester.update(event.data)
 		elif type(event) is HTTPResponseBodyChunk:
-			self._payloadDigester.update(event.data)
+			if self._payloadDigester:
+				self._payloadDigester.update(event.data)
 		elif type(event) is RawHTTPResponseBodyChunk:
-			self._brokenPayloadDigester.update(event.data)
+			if self._brokenPayloadDigester:
+				self._brokenPayloadDigester.update(event.data)
 		elif type(event) is EndOfRecord:
 			if self._blockDigester:
 				if self._recordedBlockDigest != b'sha1:' + base64.b32encode(self._blockDigester.digest()):
