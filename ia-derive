@@ -1,0 +1,16 @@
+#!/bin/bash
+identifier="$1"
+if [[ -z "${identifier}" ]]; then exit 1; fi
+
+cookies="$(grep '^logged-in-' ~/.config/ia.ini | sed 's, = ,=,' | tr '\n' ';' | sed 's,;$,,; s,;,; ,')"
+
+result="$(curl -s -H "Cookie: ${cookies}" "https://archive.org/manage/${identifier}" --data "identifier=${identifier}&admin=derive")"
+
+main="$(tr -d '\n' <<<"${result}" | grep -Po '<main.*</main>')"
+catalogueUrl="$(grep -Po 'task ID: <a href="\Khttps://catalogd\.archive\.org/log/\d+' <<<"${main}")"
+if [[ "${catalogueUrl}" ]]
+then
+	echo "success: ${catalogueUrl}"
+else
+	echo "error: $(sed 's,<[^>]\+>,,g' <<< "${main}")"
+fi
