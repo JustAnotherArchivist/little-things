@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+import datetime
+import http.client
+import itertools
+import json
+import sys
+import time
+
+domain = sys.argv[1]
+apiUrlBase = 'https://{}/api/v1/accounts/'.format(domain)
+connection = http.client.HTTPSConnection(domain)
+try:
+	consecutive404s = 0
+	for i in itertools.count(start = 1):
+		connection.request('GET', '/api/v1/accounts/{}'.format(i))
+		response = connection.getresponse()
+		data = response.read()
+		if response.status == 200:
+			j = json.loads(data)
+			print(i, j['url'])
+		if response.status == 404:
+			consecutive404s += 1
+		else:
+			consecutive404s = 0
+		# If we got enough consecutive 404s, we likely reached the end of the list.
+		# For large instances, this happens when the last 1 % of scanned IDs don't exist.
+		# For small instances, at least 100 IDs need to fail.
+		# 458.211 is the solution to 0.01 * i + 100 / i ** (1 / x) = i with i = 100 (analytical form from Wolfram|Alpha: 2*ln(10)/(2*ln(2)-2*ln(3)+2*ln(5)-ln(11)))
+		consecutive404threshold = 0.01 * i + 100 / i ** (1 / 458.211)
+		print(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S} Account {i}: {response.status} {response.reason} [404s: {consecutive404s}/{consecutive404threshold:.2f}]', file = sys.stderr)
+		if consecutive404s >= consecutive404threshold:
+			break
+		if int(response.getheader('X-RateLimit-Remaining')) < 10:
+			time.sleep(60) #TODO sleep until X-RateLimit-Reset
+finally:
+	connection.close()
