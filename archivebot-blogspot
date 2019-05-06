@@ -1,0 +1,12 @@
+#!/bin/bash
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+
+if [[ "$1" =~ ^http ]]
+then
+	url="$1"
+else
+	url="https://${1}.blogspot.com/"
+fi
+
+echo "!a ${url}"
+echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${url}") ^${url//./\\.}search\?(.*&)?reverse-paginate=true(&|$)"
