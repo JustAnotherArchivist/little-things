@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+
+# The SHA1 UUID stuff in Ruby is actually more complicated. Everything's right until the `head -c32`, but then Ruby transforms it into an integer in a quite peculiar way: https://github.com/sporkmonger/uuidtools/blob/a10724236cefd922ee5cd3de7695fb6e5fd703f5/lib/uuidtools.rb#L480-L494
+# Ruby code: ArchiveBot lib/job.rb + https://github.com/sporkmonger/uuidtools/blob/a10724236cefd922ee5cd3de7695fb6e5fd703f5/lib/uuidtools.rb#L688-L691
+# Takes the SHA-1 hash of the namespace (as raw bytes) and the name, truncates it to 32 hex chars, creates a new UUID from it, transforms two fields, converts it to a bigint, and formats it in base-36
+
+# sed/sha1sum/head/bash-based version missing the time_hi_and_version and clock_seq_hi_and_reserved modification
+#{ echo -n '82244de1-c354-4c89-bf2b-f153ce23af43' | sed 's,-,,g' | xxd -r -p; echo -n 'https://transfer.notkiska.pw/sDu6C/marwilliamson-twitter.txt'; } | sha1sum | head -c32 | { read -r hash; BASE36=($(echo {0..9} {a..z})); for i in $(bc <<< "obase=32; ibase=16; ${hash^^}" | tr -d '\\\n'); do echo -n ${BASE36[$((10#$i))]}; done; }; echo
+
+
+import hashlib
+import sys
+import uuid
+
+url = sys.argv[1] # Assume that it's normalised already
+
+# Calculate hash
+h = hashlib.sha1()
+h.update(bytes.fromhex('82244de1-c354-4c89-bf2b-f153ce23af43'.replace('-', '')))
+h.update(url.encode('ascii'))
+h = h.hexdigest()
+
+# Create and transform UUID object
+u = uuid.UUID(h[:32])
+f = list(u.fields)
+f[2] &= 0x0FFF
+f[2] |= (5 << 12)
+f[3] &= 0x3F;
+f[3] |= 0x80;
+
+# Turn it into an int
+#i = (f[0] << 96) + (f[1] << 80) + (f[2] << 64) + (f[3] << 56) + (f[4] << 48) + f[5]
+i = uuid.UUID(fields = f).int
+
+# Convert to base-36
+def int_to_base36(num):
+	# https://stackoverflow.com/a/31746873
+	assert num >= 0
+	digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+	res = ''
+	while not res or num > 0:
+		num, i = divmod(num, 36)
+		res = digits[i] + res
+	return res
+print(int_to_base36(i))

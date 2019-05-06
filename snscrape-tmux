@@ -1,0 +1,23 @@
+#!/bin/bash
+mkdir -p /tmp/snscrape
+echo 'snscrape-dev' > /tmp/snscrape/.python-version
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+export PATH="${scriptpath}:${PATH}"
+cd /tmp/snscrape
+tmux new -s snscrape \
+	-n "normalise" 'printf "\033]2;%s\033\\" "normalise"; bash' \; \
+		send-keys -t 'snscrape:normalise' 'pyenv_setup' Enter '# xclip -selection c -o | snscrape-normalise' Enter \; \
+	new-window -n "prepare" 'printf "\033]2;%s\033\\" "prepare"; bash' \; \
+		send-keys -t 'snscrape:prepare' '# xclip -selection c -o | snscrape-prepare-commands' Enter \; \
+	new-window -n "scrape" 'printf "\033]2;%s\033\\" "scrape-facebook"; bash' \; \
+			send-keys -t 'snscrape:scrape.1' 'pyenv_setup' Enter '# facebook' Enter \; \
+		split-window -v 'printf "\033]2;%s\033\\" "scrape-instagram"; bash' \; \
+			send-keys -t 'snscrape:scrape.2' 'pyenv_setup' Enter '# instagram' Enter \; \
+		split-window -v 'printf "\033]2;%s\033\\" "scrape-twitter"; bash' \; \
+			send-keys -t 'snscrape:scrape.3' 'pyenv_setup' Enter '# twitter' Enter \; \
+		select-layout -t 'snscrape:scrape' even-vertical \; \
+	new-window -n "upload" 'printf "\033]2;%s\033\\" "upload"; bash' \; \
+		send-keys -t 'snscrape:upload' 'pyenv_setup' Enter '# snscrape-upload' Enter \; \
+	new-window -n "merge" 'printf "\033]2;%s\033\\" "merge"; bash' \; \
+		send-keys -t 'snscrape:merge' '# snscrape-wiki-transfer-merge' Enter \; \
+	new-window -n "cleanup" 'printf "\033]2;%s\033\\" "cleanup"; bash'

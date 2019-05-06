@@ -1,0 +1,10 @@
+#!/bin/bash
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+
+"${scriptpath}/snscrape-extract-usernames" | while read -r service line
+do
+	if [[ "${service}" == "facebook:" || "${service}" == "instagram:" || "${service}" == "twitter:" ]]
+	then
+		echo "for user in ${line}; do $(printf "%q" "${scriptpath}")/snscrape-${service:0:-1}-user "'"${user}"; done'
+	fi
+done

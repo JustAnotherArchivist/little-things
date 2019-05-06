@@ -1,11 +1,17 @@
 #!/bin/bash
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 
-insta=
+instagramUrls=()
 
 if [[ -e transfer ]]
 then
 	echo "Error: ./transfer exists" >&2
+	exit 1
+fi
+
+if ! python3 --version &>/dev/null
+then
+	echo "Error: python3 not found" >&2
 	exit 1
 fi
 
@@ -23,11 +29,20 @@ do
 	elif [[ "${f}" == instagram-* ]]
 	then
 		echo "!a < ${upurl}"
-		insta=1
+		instagramUrls+=("${upurl}")
 	else
 		echo "!ao < ${upurl}"
 	fi
 done 3>transfer
+
+# Instagram ignores
+if [[ ${#instagramUrls[@]} -gt 0 ]]
+then
+	for url in "${instagramUrls[@]}"
+	do
+		echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${url}") ^https?://www.instagram.com/.*[?&]hl="
+	done
+fi
 
 # chromebot
 for f in "$@"
@@ -41,9 +56,4 @@ do
 	fi
 done | sed 's,^,chromebot: a ,'
 
-# Instagram ignore warning
-if [[ "${insta}" ]]
-then
-	echo "Don't forget to add the Instagram ignore! ^https?://www.instagram.com/.*[?&]hl=" >&2
-fi
 echo "Wrote ./transfer, you can run snscrape-wiki-transfer-merge now if ./wiki exists." >&2
