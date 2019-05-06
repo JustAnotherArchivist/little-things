@@ -4,9 +4,13 @@ scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 if [[ "$1" =~ ^http ]]
 then
 	url="$1"
+	url="${url/http:/https:}"
+	pattern="${url//./\\.}"
+	pattern="${pattern/https:/https?:}"
 else
 	url="https://${1}.blogspot.com/"
+	pattern="https?://${url//./\\.}/"
 fi
 
 echo "!a ${url}"
-echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${url}") ^${url//./\\.}search\?(.*&)?reverse-paginate=true(&|$)"
+echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${url}") ^${pattern}search\?(.*&)?reverse-paginate=true(&|$)"
