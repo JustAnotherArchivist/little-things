@@ -1,0 +1,12 @@
+#!/bin/bash
+for url in "$@"
+do
+	echo "!ao ${url}"
+	echo "!ao ${url}/videos"
+	echo "!ao ${url}?disable_polymer=1"
+	echo "!ao ${url}/videos?disable_polymer=1"
+	echo "chromebot: a ${url}"
+	echo "chromebot: a ${url}/videos"
+	echo "chromebot: a ${url}?disable_polymer=1"
+	echo "chromebot: a ${url}/videos?disable_polymer=1"
+done
