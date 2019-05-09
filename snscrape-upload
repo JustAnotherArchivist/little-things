@@ -1,8 +1,6 @@
 #!/bin/bash
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 
-instagramUrls=()
-
 if [[ -e transfer ]]
 then
 	echo "Error: ./transfer exists" >&2
@@ -29,20 +27,11 @@ do
 	elif [[ "${f}" == instagram-* ]]
 	then
 		echo "!a < ${upurl}"
-		instagramUrls+=("${upurl}")
+		echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${upurl}") ^https?://www.instagram.com/.*[?&]hl="
 	else
 		echo "!ao < ${upurl}"
 	fi
 done 3>transfer
-
-# Instagram ignores
-if [[ ${#instagramUrls[@]} -gt 0 ]]
-then
-	for url in "${instagramUrls[@]}"
-	do
-		echo "!ig $("${scriptpath}/archivebot-jobid-calculation" "${url}") ^https?://www.instagram.com/.*[?&]hl="
-	done
-fi
 
 # chromebot
 for f in "$@"
