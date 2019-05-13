@@ -1,11 +1,12 @@
 #!/bin/bash
 origUser="$1"
+shift
 user="$(curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36' -H 'Accept-Language: en-US,en;q=0.5' "https://www.facebook.com/${origUser}/" | grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
 if [[ "${user}" ]]
 then
 	if [[ "${user}" != "${origUser}" ]]; then echo "Username fix: ${origUser} -> ${user}" >&2; fi
 	{
 		echo "https://www.facebook.com/${user}/"
-		snscrape -v facebook-user "${user}"
+		snscrape "$@" facebook-user "${user}"
 	} > "facebook-@${user}"
 fi
