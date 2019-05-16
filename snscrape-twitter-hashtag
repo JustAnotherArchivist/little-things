@@ -6,5 +6,5 @@ shift
 	echo "https://twitter.com/hashtag/${hashtag}?src=hash"
 	echo "https://twitter.com/hashtag/${hashtag}?f=tweets&vertical=default"
 	echo "https://twitter.com/hashtag/${hashtag}?f=tweets&vertical=default&src=hash"
-	snscrape "$@" twitter-hashtag "${hashtag}"
+	snscrape --format '{url} {tcooutlinksss} {outlinksss}' "$@" twitter-hashtag "${hashtag}" | tr ' ' '\n' | grep -v '^$' | awk '!seen[$0]++'
 } > "twitter-#${hashtag}"

@@ -7,6 +7,6 @@ then
 	if [[ "${user}" != "${origUser}" ]]; then echo "Username fix: ${origUser} -> ${user}" >&2; fi
 	{
 		echo "https://twitter.com/${user}"
-		snscrape "$@" twitter-user "${user}"
-	} > "twitter-@${user}"
+		snscrape --format '{url} {tcooutlinksss} {outlinksss}' "$@" twitter-user "${user}"
+	} | tr ' ' '\n' | grep -v '^$' | awk '!seen[$0]++' > "twitter-@${user}"
 fi
