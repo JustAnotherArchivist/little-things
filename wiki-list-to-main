@@ -1,0 +1,1 @@
+grep '^==' | awk '{print; print "<!-- bot:" $0 " --><!-- /bot -->"; print "";}' | sed 's,bot:=\+ ,bot:,; s,=\+ -->,-->,'
