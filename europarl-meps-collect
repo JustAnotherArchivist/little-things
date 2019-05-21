@@ -1,0 +1,59 @@
+#!/bin/bash
+# Collect all websites and social media for MEPs based on https://www.europarl.europa.eu/meps/en/full-list/all
+# Writes to several file descriptors:
+# - Info about what it's doing to stderr
+# - Extracted URLs to FD 3
+# - Warnings about EP Newshub links to FD 4
+
+# https://unix.stackexchange.com/a/206848
+if ! { >&3; } 2>/dev/null
+then
+	echo "Error: FD 3 not open" >&1
+	exit 1
+fi
+if ! { >&4; } 2>/dev/null
+then
+	echo "Error: FD 4 not open" >&1
+	exit 1
+fi
+
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+export PATH="${scriptpath}:${PATH}"
+echo "Fetching MEP list" >&1
+curl-archivebot-ua -s "https://www.europarl.europa.eu/meps/en/full-list/all" | \
+	grep -Po '<a class="ep_content" href="\K/meps/en/\d+(?=")' | \
+	while read -r profileUrl
+	do
+		profileUrl="https://www.europarl.europa.eu${profileUrl}"
+		echo "Fetching ${profileUrl}" >&1
+		profilePage="$(curl-archivebot-ua -sL "${profileUrl}")"
+		mapfile -t urls < <(tr -d '\r\n' <<< "${profilePage}" | \
+			grep -Po '<div class="ep-a_share ep-layout_socialnetwok">.*?</ul>' | \
+			grep -Po '<a\s+([^>]*\s+)?href="\K(?!mailto:)[^"]+')
+
+		# Classification
+		for url in "${urls[@]}"
+		do
+			if [[ "${url}" =~ //((www|[a-z][a-z]-[a-z][a-z])\.)?facebook\.com/ ]]
+			then
+				echo "Facebook: ${url}"
+			elif [[ "${url}" =~ //(www\.)?instagram\.com/ ]]
+			then
+				echo "Instagram: ${url}"
+			elif [[ "${url}" =~ //(www\.)?twitter\.com/ ]]
+			then
+				echo "Twitter: ${url}"
+			elif [[ "${url}" =~ //([^/]+\.)?youtube\.com/ || "${url}" =~ //youtu\.be/ ]]
+			then
+				echo "YouTube: ${url}"
+			else
+				echo "Other: ${url}"
+			fi
+		done >&3
+
+		# Check if there's a newshub mention and print a warning about that if necessary
+		if grep -q 'container_header_newshub' <<< "${profilePage}"
+		then
+			echo "Has EP Newshub link: ${profileUrl}" >&4
+		fi
+	done
