@@ -3,16 +3,35 @@
 errorUrls=()
 while read -r url
 do
-	if [[ "${url}" =~ ^https?://(www|m|[a-z][a-z]-[a-z][a-z]).facebook.com/[^/]+/?$ ]]
+	if [[ "${url}" =~ ^https?://(www|m|[a-z][a-z]-[a-z][a-z]).facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|profile\.php\?id=[0-9]+(&|$)) ]]
 	then
-		user="$(curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36' -H 'Accept-Language: en-US,en;q=0.5' "https://www.${url#*.}" | grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
+		if [[ "${url}" == *profile.php* ]]
+		then
+			url="${url%%&*}"
+		else
+			url="${url%%\?*}"
+		fi
+		page="$(curl -sL -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36' -H 'Accept-Language: en-US,en;q=0.5' "https://www.${url#*.}")"
+		user="$(grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' <<< "${page}" | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
 		if [[ "${user}" ]]
 		then
 			echo "https://www.facebook.com/${user}/"
+			continue
 		else
-			errorUrls+=("${url}")
-			echo "${url}"
+			if grep -q 'id="pagelet_loggedout_sign_up"' <<< "${page}"
+			then
+				# Profile page which is only visible when logged in
+				# Extract canonical URL
+				user="$(grep -Po '<link rel="canonical" href="\K[^"]+' <<< "${page}")"
+				if [[ "${user}" ]]
+				then
+					echo "${user}"
+					continue
+				fi
+			fi
 		fi
+		errorUrls+=("${url}")
+		echo "${url}"
 	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+$ ]]
 	then
 		user="$(snscrape --max-results 1 twitter-user "${url##*/}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
