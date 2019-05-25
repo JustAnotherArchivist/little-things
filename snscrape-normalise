@@ -32,8 +32,9 @@ do
 		fi
 		errorUrls+=("${url}")
 		echo "${url}"
-	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+$ ]]
+	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+/?$ ]]
 	then
+		url="${url%/}"
 		user="$(snscrape --max-results 1 twitter-user "${url##*/}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
 		if [[ "${user}" ]]
 		then
