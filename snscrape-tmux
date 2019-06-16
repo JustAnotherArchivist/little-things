@@ -6,9 +6,9 @@ export PATH="${scriptpath}:${PATH}"
 cd /tmp/snscrape
 tmux new -s snscrape \
 	-n "normalise" 'printf "\033]2;%s\033\\" "normalise"; bash' \; \
-		send-keys -t 'snscrape:normalise' 'pyenv_setup' Enter '# xclip -selection c -o | snscrape-normalise' Enter \; \
+		send-keys -t 'snscrape:normalise' 'pyenv_setup' Enter '# xclip -selection c -o | snscrape-normalise >wiki' Enter '# xclip -selection c <wiki' Enter \; \
 	new-window -n "prepare" 'printf "\033]2;%s\033\\" "prepare"; bash' \; \
-		send-keys -t 'snscrape:prepare' '# xclip -selection c -o | snscrape-prepare-commands' Enter \; \
+		send-keys -t 'snscrape:prepare' '# snscrape-prepare-commands <wiki' Enter \; \
 	new-window -n "scrape" 'printf "\033]2;%s\033\\" "scrape-facebook"; bash' \; \
 			send-keys -t 'snscrape:scrape.1' 'pyenv_setup' Enter '# facebook' Enter \; \
 		split-window -v 'printf "\033]2;%s\033\\" "scrape-instagram"; bash' \; \
