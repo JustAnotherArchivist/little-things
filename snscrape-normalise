@@ -3,6 +3,14 @@
 errorUrls=()
 while read -r url
 do
+	if [[ "${url}" == '* '* ]]
+	then
+		prefix="${url::2}"
+		url="${url:2}"
+	else
+		prefix=""
+	fi
+
 	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|profile\.php\?id=[0-9]+(&|$)) ]]
 	then
 		if [[ "${url}" == *profile.php* ]]
@@ -15,7 +23,7 @@ do
 		user="$(grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' <<< "${page}" | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
 		if [[ "${user}" ]]
 		then
-			echo "https://www.facebook.com/${user}/"
+			echo "${prefix}https://www.facebook.com/${user}/"
 			continue
 		else
 			if grep -q 'id="pagelet_loggedout_sign_up"' <<< "${page}"
@@ -25,13 +33,13 @@ do
 				user="$(grep -Po '<link rel="canonical" href="\K[^"]+' <<< "${page}")"
 				if [[ "${user}" ]]
 				then
-					echo "${user}"
+					echo "${prefix}${user}"
 					continue
 				fi
 			fi
 		fi
 		errorUrls+=("${url}")
-		echo "${url}"
+		echo "${prefix}${url}"
 	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+/?(\?.*)?$ ]]
 	then
 		url="${url%%\?*}"
@@ -39,18 +47,18 @@ do
 		user="$(snscrape --max-results 1 twitter-user "${url##*/}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
 		if [[ "${user}" ]]
 		then
-			echo "https://twitter.com/${user}"
+			echo "${prefix}https://twitter.com/${user}"
 		else
 			errorUrls+=("${url}")
-			echo "${url}"
+			echo "${prefix}${url}"
 		fi
 	elif [[ "${url}" =~ ^https?://(www\.)?instagram\.com/[^/]+/?$ ]]
 	then
 		user="${url%/}"
 		user="${user##*/}"
-		echo "https://www.instagram.com/${user,,}/"
+		echo "${prefix}https://www.instagram.com/${user,,}/"
 	else
-		echo "${url}"
+		echo "${prefix}${url}"
 	fi
 done
 
