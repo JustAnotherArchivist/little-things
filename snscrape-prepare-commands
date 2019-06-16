@@ -1,9 +1,18 @@
 #!/bin/bash
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 
-"${scriptpath}/snscrape-extract-usernames" | while read -r service line
+"${scriptpath}/snscrape-extract" | while read -r service line
 do
-	if [[ "${service}" == "facebook:" || "${service}" == "instagram:" || "${service}" == "twitter:" ]]
+	if [[ "${service}" == "facebook:" ]]
+	then
+		echo "printf '%s\n' ${line} | parallel -n 1 -k -j 4 $(printf "%q" "${scriptpath}")/snscrape-facebook-user"
+	elif [[ "${service}" == "twitter-hashtag:" ]]
+	then
+		echo "printf '%s\n' ${line} | parallel -n 1 -k -j 3 $(printf "%q" "${scriptpath}")/snscrape-twitter-hashtag"
+	elif [[ "${service}" == "twitter-user:" ]]
+	then
+		echo "printf '%s\n' ${line} | parallel -n 1 -k -j 3 $(printf "%q" "${scriptpath}")/snscrape-twitter-user"
+	elif [[ "${service}" == "instagram:" ]]
 	then
 		echo "for user in ${line}; do $(printf "%q" "${scriptpath}")/snscrape-${service:0:-1}-user "'"${user}"; done'
 	fi

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Extract from stdin social media usernames suitable for snscrape, grouped by service
 grep -Po '(https?://www\.\Kfacebook\.com/(?!pages/)\S+(?=/)|https?://www\.\Kinstagram\.com/\S+(?=/)|https?://\Ktwitter\.com/\S+)' |
-	sed 's,\.com/, ,' |
+	sed 's,\.com/, ,; s,^twitter hashtag/,twitter-hashtag ,; s,twitter ,twitter-user ,' |
 	sort |
 	awk '
 		BEGIN {
