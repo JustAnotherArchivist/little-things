@@ -21,7 +21,7 @@ while i < len(sys.argv):
 		print('Options:', file = sys.stderr)
 		print(f'  --format FORMAT    Modify the output format; FORMAT defaults to {format!r}; available fields: url, key, size, and all fields returned by S3 (e.g. LastModified)', file = sys.stderr)
 		print( '  --marker KEY       Start after a particular key instead of from the beginning', file = sys.stderr)
-		print( '  --with-list-urls   Enables printing the list URLs retrieved to stderr', file = sys.stderr)
+		print( '  --with-list-urls   Enables printing the list URLs retrieved to FD 3', file = sys.stderr)
 		sys.exit(1)
 	elif arg == '--with-list-urls':
 		withListUrls = True
