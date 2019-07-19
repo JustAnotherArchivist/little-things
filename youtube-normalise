@@ -1,6 +1,14 @@
 #!/bin/bash
 while read -r url
 do
+	if [[ "${url}" == '* '* ]]
+	then
+		prefix='* '
+		url="${url:2}"
+	else
+		prefix=''
+	fi
+
 	if [[ "${url}" =~ ^https?://(www\.)?youtube\.com/ ]]
 	then
 		if [[ "${url}" == *'?'* ]]
@@ -13,17 +21,17 @@ do
 		canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kuser/[^"]+' <<< "${page}")"
 		if [[ "${canonical}" ]]
 		then
-			echo "https://www.youtube.com/${canonical}"
+			echo "${prefix}https://www.youtube.com/${canonical}"
 		else
 			canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kchannel/[^"]+' <<< "${page}")"
 			if [[ "${canonical}" ]]
 			then
-				echo "https://www.youtube.com/${canonical}"
+				echo "${prefix}https://www.youtube.com/${canonical}"
 			else
-				echo "${url}"
+				echo "${prefix}${url}"
 			fi
 		fi
 	else
-		echo "${url}"
+		echo "${prefix}${url}"
 	fi
 done
