@@ -175,7 +175,7 @@ def iter_warc(f):
 								yield HTTPResponseBodyChunk(chunk)
 								httpBody = httpBody[chunkLineEnd + 2 + chunkLength + 2:]
 						else:
-							yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody)[:50])
+							yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody))
 				else:
 					print('Warning: malformed HTTP response, skipping', file = sys.stderr)
 			else:
