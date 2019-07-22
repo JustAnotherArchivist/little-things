@@ -1,0 +1,3 @@
+#!/bin/bash
+# Sort == level-two wiki sections == alphabetically while keeping all section contents (including subsections) in the given order
+tr '\n' '\r' | sed 's,\r== ,\n== ,g' | sort | tr '\r' '\n'
