@@ -261,15 +261,15 @@ class VerifyMode(ProcessMode):
 		elif type(event) is EndOfRecord:
 			if self._blockDigester and self._recordedBlockDigest:
 				if not self._recordedBlockDigest.equals(self._blockDigester.digest()):
-					print('Block digest mismatch for record {}: recorded {} v calculated {}'.format(self._recordID, self._recordedBlockDigest.format(), self._recordedBlockDigest.format(self._blockDigester.digest())))
+					print('Block digest mismatch for record {}: recorded {} v calculated {}'.format(self._recordID, self._recordedBlockDigest.format(), self._recordedBlockDigest.format(self._blockDigester.digest())), file = sys.stderr)
 			if self._payloadDigester and self._recordType in (b'request', b'response'): #TODO: Support revisit
 				if not self._recordedPayloadDigest.equals(self._payloadDigester.digest()):
 					if self._recordedPayloadDigest.equals(self._brokenPayloadDigester.digest()):
 						if not self._printedBrokenPayloadWarning:
-							print('Warning: WARC uses incorrect payload digests without stripping the transfer encoding')
+							print('Warning: WARC uses incorrect payload digests without stripping the transfer encoding', file = sys.stderr)
 							self._printedBrokenPayloadWarning = True
 					else:
-						print('Payload digest mismatch for record {}: recorded {} vs. calculated {} (calculated broken {})'.format(self._recordID, self._recordedPayloadDigest.format(), self._recordedPayloadDigest.format(self._payloadDigester.digest()), self._recordedPayloadDigest.format(self._brokenPayloadDigester.digest())))
+						print('Payload digest mismatch for record {}: recorded {} vs. calculated {} (calculated broken {})'.format(self._recordID, self._recordedPayloadDigest.format(), self._recordedPayloadDigest.format(self._payloadDigester.digest()), self._recordedPayloadDigest.format(self._brokenPayloadDigester.digest())), file = sys.stderr)
 
 
 class DumpResponsesMode(ProcessMode):
