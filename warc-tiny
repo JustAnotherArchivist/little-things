@@ -179,6 +179,7 @@ def iter_warc(f):
 							yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody))
 				else:
 					print('Warning: malformed HTTP response in record {}, skipping'.format(recordID), file = sys.stderr)
+					yield WARCBlockChunk(warcContent)
 			else:
 				yield WARCBlockChunk(warcContent)
 			yield EndOfRecord()
