@@ -166,7 +166,7 @@ def iter_warc(f):
 									chunkLength = chunkLine[:chunkLine.index(b';')].strip()
 								else:
 									chunkLength = chunkLine.strip()
-								if chunkLength.lstrip(b'0123456789abcdef') != b'':
+								if chunkLength.lstrip(b'0123456789abcdefABCDEF') != b'':
 									print('Error: malformed chunk length {!r} in record {}, skipping'.format(chunkLength, recordID), file = sys.stderr)
 									break
 								chunkLength = int(chunkLength, base = 16)
