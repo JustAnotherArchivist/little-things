@@ -102,7 +102,7 @@ def iter_warc(f):
 			if not buf:
 				break
 			warcHeaderBuf, buf = buf.split(b'\r\n\r\n', 1)
-			assert warcHeaderBuf.startswith(b'WARC/1.0\r\n')
+			assert warcHeaderBuf.startswith(b'WARC/1.0\r\n') or warcHeaderBuf.startswith(b'WARC/1.1\r\n')
 			assert b'\r\nContent-Length:' in warcHeaderBuf
 			warcHeaders = tuple(tuple(map(bytes.strip, x.split(b':', 1))) for x in warcHeaderBuf.split(b'\r\n'))
 			warcContentType = next(x[1] for x in warcHeaders if x[0] == b'Content-Type')
