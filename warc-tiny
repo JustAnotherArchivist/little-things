@@ -364,11 +364,14 @@ def main():
 
 	processor = processorMap[mode]()
 
-	for f in files:
-		print('Info: processing {}'.format(f), file = sys.stderr)
-		processor.process_event(NewFile())
-		for event in iter_warc(f):
-			processor.process_event(event)
+	try:
+		for f in files:
+			print('Info: processing {}'.format(f), file = sys.stderr)
+			processor.process_event(NewFile())
+			for event in iter_warc(f):
+					processor.process_event(event)
+	except BrokenPipeError:
+		return
 
 
 if __name__ == '__main__':
