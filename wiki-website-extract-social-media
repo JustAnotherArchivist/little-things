@@ -1,0 +1,20 @@
+#!/bin/bash
+# Reads a wiki page in the new-style viewer format from stdin, runs everything that looks like a website through website-extract-social-media, and formats the output accordingly
+
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+while read -r line
+do
+	echo "${line}"
+	if [[ "${line}" == '* http://'* || "${line}" == '* https://'* ]]
+	then
+		url="${line:2}"
+		if [[ "${url}" == *' | '* ]]
+		then
+			url="${url%% | *}"
+		fi
+		if ! grep -Pq '//(www\.)?(facebook\.com|flickr\.com|instagram\.com|twitter\.com|vk\.com|youtube\.com|youtu\.be)/' <<<"${url}"
+		then
+			"${scriptpath}/website-extract-social-media" "${url}" < <(:) | sed 's,^\(https\?://\(www\.\)\?\(.*\)\)$,\3 \1,' | sort | awk '{ print $2 }' | sed 's,^,* ,'
+		fi
+	fi
+done

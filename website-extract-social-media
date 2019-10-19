@@ -1,0 +1,91 @@
+#!/bin/bash
+function fetch_n_extract {
+	local url="$1"
+	{
+		curl -sSL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "${url}" | \
+		  grep -Fi -e 'facebook' -e 'flickr' -e 'instagram' -e 'twitter' -e 't.me' -e 'youtube' -e 'youtu.be' -e 'vk.com' | \
+		  tee \
+			>(
+			  # Facebook
+			  grep -Poi 'facebook\.com/[^/ <"'"'"']+' | \
+			  sed 's,^,https://www.,' | \
+			  grep -vi -e '^https://www\.facebook\.com/2008$' -e '^https://www\.facebook\.com/tr\?' -e '^https://www\.facebook\.com/plugins$' | \
+			  grep -Pvi '^https://www\.facebook\.com/sharer(\.php\?|\?|$)'
+			) \
+			>(
+			  # Flickr
+			  grep -Poi 'flickr\.com/photos/[^/ <"'"'"']+' | \
+			  sed 's,^,https://www.,'
+			) \
+			>(
+			  # Instagram
+			  grep -Poi 'instagram\.com/[^/ <"'"'"']+' | \
+			  sed 's,^,https://www.,'
+			) \
+			>(
+			  # Telegram
+			  grep -Poi '//(www\.)?t\.me/[^/ <"'"'"']+' | \
+			  sed 's,^//,,; s,^www\.,,; s,^,https://,'
+			) \
+			>(
+			  # Twitter
+			  grep -Poi 'twitter\.com/[^/ <"'"'"']+' | \
+			  sed 's,^,https://,' | \
+			  grep -vi -e '^https://twitter\.com/home\?' -e '^https://twitter\.com/widgets\.js$' -e '^https://twitter\.com/share\?' | \
+			  sed 's,\([?&]\)ref_src=[^&]\+&\?,\1,; s,?$,,'
+			) \
+			>(
+			  # VKontakte
+			  grep -Poi 'vk\.com/[^/ <"'"'"']+' | \
+			  sed 's,^,https://,'
+			) \
+			>(
+			  # YouTube
+			  grep -Poi '(youtube\.com/((user|channel|embed)/)?[^/ <"'"'"']+|youtu\.be/[^/ <"'"'"']+)' | \
+			  awk '/^youtube/ { print "https://www." $0 }  /^youtu\.be/ { print "https://" $0 }'
+			) \
+			>/dev/null
+	} | awk '!seen[$0]++'
+}
+
+# Parse options
+printInputUrl=
+while [[ $# -gt 0 ]]
+do
+	if [[ "$1" == '--print-input-urls' || "$1" == '--print-input-url' ]]
+	then
+		printInputUrl=true
+		shift
+	elif [[ "$1" == '--' ]]
+	then
+		# End of options
+		shift
+		break
+	elif [[ "$1" == '--'* ]]
+	then
+		echo "Unknown option: $1" >&2
+		exit 1
+	else
+		# Assume end of options
+		break
+	fi
+done
+
+{
+	for arg in "$@"
+	do
+		echo "${arg}"
+	done
+
+	if [ ! -t 0 ]
+	then
+		cat
+	fi
+} | while read -r url
+do
+	if [[ "${printInputUrl}" ]]
+	then
+		echo "${url}"
+	fi
+	fetch_n_extract "${url}"
+done
