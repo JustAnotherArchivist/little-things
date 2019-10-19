@@ -9,8 +9,8 @@ function fetch_n_extract {
 			  # Facebook
 			  grep -Poi 'facebook\.com/(pages/[^/ <"'"'"']+/|groups/|pg/)?[^/ <"'"'"']+' | \
 			  sed 's,^,https://www.,' | \
-			  grep -vi -e '^https://www\.facebook\.com/2008$' -e '^https://www\.facebook\.com/tr\?' -e '^https://www\.facebook\.com/plugins$' | \
-			  grep -Pvi '^https://www\.facebook\.com/sharer(\.php\?|\?|$)'
+			  grep -vi -e '^https://www\.facebook\.com/2008$' -e '^https://www\.facebook\.com/tr\?' -e '^https://www\.facebook\.com/plugins$' -e '^https://www\.facebook\.com/l\.php\?' | \
+			  grep -Pvi '^https://www\.facebook\.com/share(r(\.php)?)?(\?|$)'
 			) \
 			>(
 			  # Flickr
