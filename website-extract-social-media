@@ -29,7 +29,7 @@ function fetch_n_extract {
 			) \
 			>(
 			  # Twitter
-			  grep -Poi 'twitter\.com/[^/ <"'"'"']+' | \
+			  grep -Poi 'twitter\.com/(hashtag/)?[^/ <"'"'"']+' | \
 			  sed 's,^,https://,' | \
 			  grep -vi -e '^https://twitter\.com/home\?' -e '^https://twitter\.com/widgets\.js$' -e '^https://twitter\.com/share\?' | \
 			  sed 's,\([?&]\)ref_src=[^&]\+&\?,\1,; s,?$,,'
