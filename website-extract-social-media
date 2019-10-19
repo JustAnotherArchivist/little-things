@@ -19,8 +19,9 @@ function fetch_n_extract {
 			) \
 			>(
 			  # Instagram
-			  grep -Poi 'instagram\.com/[^/ <"'"'"']+' | \
-			  sed 's,^,https://www.,'
+			  grep -Poi 'instagram\.com/(p/)?[^/ <"'"'"']+' | \
+			  sed 's,^,https://www.,' | \
+			  grep -Pvi -e '^https://www\.instagram\.com/v?p$'
 			) \
 			>(
 			  # Telegram
