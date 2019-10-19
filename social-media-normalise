@@ -11,7 +11,7 @@ do
 		prefix=""
 	fi
 
-	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|profile\.php\?id=[0-9]+(&|$)) ]]
+	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|pg/[^/]+([/?]|$)|profile\.php\?id=[0-9]+(&|$)) ]]
 	then
 		if [[ "${url}" == *profile.php* ]]
 		then
