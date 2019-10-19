@@ -44,7 +44,8 @@ do
 	then
 		url="${url%%\?*}"
 		url="${url%/}"
-		user="$(snscrape --max-results 1 twitter-user "${url##*/}" | grep -Po '^https?://twitter\.com/\K[^/]+')"
+		unnormalisedUser="${url##*/}"
+		user="$(curl -sL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "https://twitter.com/${unnormalisedUser}" | grep -Po '<a class="([^"]*\s)?ProfileHeaderCard-screennameLink(\s[^"]*)?" href="/\K[^/"]+(?=")')"
 		if [[ "${user}" ]]
 		then
 			echo "${prefix}https://twitter.com/${user}"
