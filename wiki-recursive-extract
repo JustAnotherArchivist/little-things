@@ -4,6 +4,31 @@
 # Everything else is run through website-extract-social-media.
 # This is done recursively until no new links are discovered anymore.
 
+verbose=
+while [[ $# -gt 0 ]]
+do
+	if [[ "$1" == '--verbose' || "$1" == '-v' ]]
+	then
+		verbose='--verbose'
+	else
+		echo "Unknown option: $1" >&2
+		exit 1
+	fi
+	shift
+done
+
+function verbose_echo {
+	if [[ "${verbose}" ]]
+	then
+		echo "$@"
+	fi
+}
+
+function stderr_annotate {
+	name="${1##*/}"
+	"$@" 2> >(while read -r line; do echo "[${name}] ${line}"; done >&2)
+}
+
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 declare -A sectionUrls
 while read -r line
@@ -11,6 +36,7 @@ do
 	echo "${line}"
 	if [[ "${line}" == '=='* ]]
 	then
+		verbose_echo "${line}" >&2
 		unset sectionUrls
 		declare -A sectionUrls
 	fi
@@ -31,11 +57,9 @@ do
 
 			if grep -Pq '//([^/]+\.)?(facebook\.com|flickr\.com|instagram\.com|twitter\.com|vk\.com|youtube\.com|youtu\.be)/' <<<"${curUrl}"
 			then
-				echo "Calling social-media-extract-profile-link on ${curUrl}" >&2
-				mapfile -t outUrls < <("${scriptpath}/social-media-extract-profile-link" "${curUrl}" < <(:))
+				mapfile -t outUrls < <(stderr_annotate "${scriptpath}/social-media-extract-profile-link" ${verbose} "${curUrl}" < <(:))
 			else
-				echo "Calling website-extract-social-media on ${curUrl}" >&2
-				mapfile -t outUrls < <("${scriptpath}/website-extract-social-media" "${curUrl}" < <(:) | sed 's,^\(https\?://\(www\.\)\?\(.*\)\)$,\3 \1,' | sort | awk '{ print $2 }')
+				mapfile -t outUrls < <(stderr_annotate "${scriptpath}/website-extract-social-media" ${verbose} "${curUrl}" < <(:))
 			fi
 
 			for outUrl in "${outUrls[@]}"

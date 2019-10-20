@@ -1,7 +1,15 @@
 #!/bin/bash
 # Given social media links on stdin or as args, this extracts the link in the profile description, if any.
 
+function verbose_echo {
+	if [[ "${verbose}" ]]
+	then
+		echo "$@"
+	fi
+}
+
 function fetch {
+	verbose_echo "Fetching $1" >&2
 	curl -sL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "$1"
 }
 
@@ -32,6 +40,22 @@ function fetch_n_extract {
 		fetch "${u}" | tr -d '\n' | grep -Po '<div\s([^>]*\s)?id\s*=\s*"header-links".*?</div>' | grep -Po 'href="/redirect\?([^"]*&(amp;)?)?q=\K[^&"]+' | sed 's,%3A,:,g; s,%2F,/,g; s,%25,%,g'
 	fi
 }
+
+verbose=
+for arg in "$@"
+do
+	if [[ "${arg}" == '--verbose' || "${arg}" == '-v' ]]
+	then
+		verbose=1
+		shift
+	elif [[ "${arg}" == '--' ]]
+	then
+		shift
+	else
+		# Assume end of options
+		break
+	fi
+done
 
 {
 	for arg in "$@"

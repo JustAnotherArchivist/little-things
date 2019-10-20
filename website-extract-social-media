@@ -1,6 +1,9 @@
 #!/bin/bash
+function verbose_echo { if [[ "${verbose}" ]]; then echo "$@"; fi; }
+
 function fetch_n_extract {
 	local url="$1"
+	verbose_echo "Fetching ${url}" >&2
 	{
 		curl -sSL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "${url}" | \
 		  grep -Fi -e 'facebook' -e 'flickr' -e 'instagram' -e 'twitter' -e 't.me' -e 'youtube' -e 'youtu.be' -e 'vk.com' | \
@@ -52,11 +55,16 @@ function fetch_n_extract {
 
 # Parse options
 printInputUrl=
+verbose=
 while [[ $# -gt 0 ]]
 do
 	if [[ "$1" == '--print-input-urls' || "$1" == '--print-input-url' ]]
 	then
 		printInputUrl=true
+		shift
+	elif [[ "$1" == '--verbose' || "$1" == 'v' ]]
+	then
+		verbose=1
 		shift
 	elif [[ "$1" == '--' ]]
 	then
