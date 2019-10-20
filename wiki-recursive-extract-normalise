@@ -26,13 +26,15 @@ function verbose_echo {
 }
 
 function stderr_annotate {
-	name="${1##*/}"
+	name="$1"
+	shift
+	if [[ "${name}" == '' ]]; then name="${1##*/}"; fi
 	"$@" 2> >(while read -r line; do echo "[${name}] ${line}"; done >&2)
 }
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 declare -A sectionUrls
-stderr_annotate "${scriptpath}/url-normalise" ${verbose} | while read -r line
+stderr_annotate 'url-normalise/before' "${scriptpath}/url-normalise" ${verbose} | while read -r line
 do
 	echo "${line}"
 	if [[ "${line}" == '=='* ]]
@@ -58,9 +60,9 @@ do
 
 			if grep -Pq '//([^/]+\.)?(facebook\.com|flickr\.com|instagram\.com|twitter\.com|vk\.com|youtube\.com|youtu\.be)/' <<<"${curUrl}"
 			then
-				mapfile -t outUrls < <(stderr_annotate "${scriptpath}/social-media-extract-profile-link" ${verbose} "${curUrl}" < <(:) | stderr_annotate "${scriptpath}/url-normalise" ${verbose})
+				mapfile -t outUrls < <(stderr_annotate '' "${scriptpath}/social-media-extract-profile-link" ${verbose} "${curUrl}" < <(:) | stderr_annotate 'url-normalise/post-social' "${scriptpath}/url-normalise" ${verbose})
 			else
-				mapfile -t outUrls < <(stderr_annotate "${scriptpath}/website-extract-social-media" ${verbose} "${curUrl}" < <(:) | stderr_annotate "${scriptpath}/url-normalise" ${verbose})
+				mapfile -t outUrls < <(stderr_annotate '' "${scriptpath}/website-extract-social-media" ${verbose} "${curUrl}" < <(:) | stderr_annotate 'url-normalise/post-web' "${scriptpath}/url-normalise" ${verbose})
 			fi
 
 			for outUrl in "${outUrls[@]}"
@@ -78,4 +80,4 @@ do
 			done
 		done
 	fi
-done | stderr_annotate "${scriptpath}/url-normalise" ${verbose}
+done | stderr_annotate 'url-normalise/after' "${scriptpath}/url-normalise" ${verbose}
