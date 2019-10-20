@@ -1,0 +1,133 @@
+#!/bin/bash
+# Taking a list of URLs from stdin (optionally in new-viewer style wiki format), every URL is normalised as follows:
+# - For social media URLs, the correct capitalisation is extracted and extraneous parameters are removed.
+# - For YouTube user or channel URLs, the canonical base URL is extracted.
+# - For anything else, retrieval is attempted and the final, post-redirect URL is used. (To not follow redirects, use --other-no-redirects.)
+
+otherCurlRedirectOpt='-L'
+verbose=
+while [[ $# -gt 0 ]]
+do
+	if [[ "$1" == '--other-no-redirects' ]]
+	then
+		otherCurlRedirectOpt=
+	elif [[ "$1" == '--verbose' || "$1" == '-v' ]]
+	then
+		verbose=1
+	else
+		echo "Unknown option: $1" >&2
+		exit 1
+	fi
+	shift
+done
+
+function verbose_echo {
+	if [[ "${verbose}" ]]
+	then
+		echo "$@"
+	fi
+}
+
+userAgent='Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0'
+
+while read -r line
+do
+	if [[ "${line}" != 'http://'* && "${line}" != 'https://'* && "${line}" != '* http://'* && "${line}" != '* https://'* ]]
+	then
+		echo "${line}"
+		continue
+	fi
+
+	if [[ "${line}" == '* '* ]]
+	then
+		prefix="${line::2}"
+		url="${line:2}"
+	else
+		prefix=""
+		url="${line}"
+	fi
+
+	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|pg/[^/]+([/?]|$)|profile\.php\?id=[0-9]+(&|$)) ]]
+	then
+		verbose_echo "Normalising Facebook URL: ${url}" >&2
+		if [[ "${url}" == *profile.php* ]]
+		then
+			url="${url%%&*}"
+		else
+			url="${url%%\?*}"
+		fi
+		page="$(curl -sL -A "${userAgent}" -H 'Accept-Language: en-US,en;q=0.5' "https://www.facebook.com/${url#*facebook.com/}")"
+		user="$(grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' <<< "${page}" | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
+		if [[ "${user}" ]]
+		then
+			echo "${prefix}https://www.facebook.com/${user}/"
+			continue
+		elif grep -q 'id="pagelet_loggedout_sign_up"' <<< "${page}"
+		then
+			# Profile page which is only visible when logged in
+			# Extract canonical URL
+			user="$(grep -Po '<link rel="canonical" href="\K[^"]+' <<< "${page}")"
+			if [[ "${user}" ]]
+			then
+				echo "${prefix}${user}"
+				continue
+			fi
+		fi
+		echo "Failed to normalise Facebook URL: ${url}" >&2
+		echo "${prefix}${url}"
+	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+/?(\?.*)?$ ]]
+	then
+		verbose_echo "Normalising Twitter URL: ${url}" >&2
+		url="${url%%\?*}"
+		url="${url%/}"
+		unnormalisedUser="${url##*/}"
+		user="$(curl -sL -A "${userAgent}" "https://twitter.com/${unnormalisedUser}" | grep -Po '<a class="([^"]*\s)?ProfileHeaderCard-screennameLink(\s[^"]*)?" href="/\K[^/"]+(?=")')"
+		if [[ "${user}" ]]
+		then
+			echo "${prefix}https://twitter.com/${user}"
+		else
+			echo "Failed to normalise Twitter URL: ${url}" >&2
+			echo "${prefix}${url}"
+		fi
+	elif [[ "${url}" =~ ^https?://(www\.)?instagram\.com/[^/]+/?$ ]]
+	then
+		verbose_echo "Normalising Instagram URL: ${url}" >&2
+		user="${url%/}"
+		user="${user##*/}"
+		echo "${prefix}https://www.instagram.com/${user,,}/"
+	elif [[ "${url}" =~ ^https?://(www\.)?youtube\.com/ ]]
+	then
+		verbose_echo "Normalising YouTube URL: ${url}" >&2
+		if [[ "${url}" == *'?'* ]]
+		then
+			rurl="${url}&disable_polymer=1"
+		else
+			rurl="${url}?disable_polymer=1"
+		fi
+		page="$(curl -4sL -A "${userAgent}" -H 'Accept-Language: en-US,en;q=0.5' "${rurl}")"
+		canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kuser/[^"]+' <<< "${page}")"
+		if [[ "${canonical}" ]]
+		then
+			echo "${prefix}https://www.youtube.com/${canonical}"
+		else
+			canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kchannel/[^"]+' <<< "${page}")"
+			if [[ "${canonical}" ]]
+			then
+				echo "${prefix}https://www.youtube.com/${canonical}"
+			else
+				echo "Failed to normalise YouTube URL: ${url}" >&2
+				echo "${prefix}${url}"
+			fi
+		fi
+	else
+		verbose_echo "Normalising other URL: ${url}" >&2
+		canonical="$(curl -sS ${otherCurlRedirectOpt} --max-time 10 -A "${userAgent}" -o /dev/null -w '%{url_effective}' "${url}")"
+		if [[ "${canonical}" ]]
+		then
+			echo "${prefix}${canonical}"
+		else
+			echo "Failed to normalise other URL: ${url}" >&2
+			echo "${prefix}${url}"
+		fi
+	fi
+done
