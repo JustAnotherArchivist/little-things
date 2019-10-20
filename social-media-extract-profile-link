@@ -25,7 +25,7 @@ function fetch_n_extract {
 		elif grep -qF 'id="pagelet_loggedout_sign_up"' <<< "${page}"
 		then
 			# Profile overview only
-			grep -Po 'href="https://l\.facebook\.com/l\.php\?u=\K[^&]+' <<<"${page}" | sed 's,%3A,:,g; s,%2F,/,g'
+			grep -Po '<div\s([^<]*\s)?id\s*=\s*"pagelet_contact".*<div\s([^<]*\s)?id\s*=\s*"bottomContent"' <<<"${page}" | grep -Po 'href="https://l\.facebook\.com/l\.php\?u=\K[^&]+' | sed 's,%3A,:,g; s,%2F,/,g'
 		fi
 	elif [[ "${url}" == *'instagram.com/'* ]]
 	then
