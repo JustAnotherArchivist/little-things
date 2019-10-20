@@ -1,0 +1,56 @@
+#!/bin/bash
+# Takes a wiki page in new-style viewer format on stdin.
+# Everything that looks like a social media link (including YouTube) is run through social-media-extract-profile-link.
+# Everything else is run through website-extract-social-media.
+# This is done recursively until no new links are discovered anymore.
+
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+declare -A sectionUrls
+while read -r line
+do
+	echo "${line}"
+	if [[ "${line}" == '=='* ]]
+	then
+		unset sectionUrls
+		declare -A sectionUrls
+	fi
+	if [[ "${line}" == '* http://'* || "${line}" == '* https://'* ]]
+	then
+		url="${line:2}"
+		if [[ "${url}" == *' | '* ]]
+		then
+			url="${url%% | *}"
+		fi
+
+		sectionUrls["${url}"]=1
+		toProcess=("${url}")
+		while [[ ${#toProcess[@]} -gt 0 ]]
+		do
+			curUrl="${toProcess[0]}"
+			toProcess=("${toProcess[@]:1}")
+
+			if grep -Pq '//([^/]+\.)?(facebook\.com|flickr\.com|instagram\.com|twitter\.com|vk\.com|youtube\.com|youtu\.be)/' <<<"${curUrl}"
+			then
+				echo "Calling social-media-extract-profile-link on ${curUrl}" >&2
+				mapfile -t outUrls < <("${scriptpath}/social-media-extract-profile-link" "${curUrl}" < <(:))
+			else
+				echo "Calling website-extract-social-media on ${curUrl}" >&2
+				mapfile -t outUrls < <("${scriptpath}/website-extract-social-media" "${curUrl}" < <(:) | sed 's,^\(https\?://\(www\.\)\?\(.*\)\)$,\3 \1,' | sort | awk '{ print $2 }')
+			fi
+
+			for outUrl in "${outUrls[@]}"
+			do
+				if [[ "${sectionUrls[${outUrl}]}" ]]
+				then
+					# The discovered URL was processed already, skip it entirely
+					continue
+				else
+					# Not-yet-known URL, add to the list of URLs to process, mark as seen, and print
+					toProcess+=("${outUrl}")
+					sectionUrls["${outUrl}"]=1
+					echo "* ${outUrl}"
+				fi
+			done
+		done
+	fi
+done
