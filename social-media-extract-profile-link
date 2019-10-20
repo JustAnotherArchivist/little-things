@@ -1,0 +1,53 @@
+#!/bin/bash
+# Given social media links on stdin or as args, this extracts the link in the profile description, if any.
+
+function fetch {
+	curl -sL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "$1"
+}
+
+function fetch_n_extract {
+	url="$1"
+	if [[ "${url}" == *'facebook.com/'* ]]
+	then
+		page="$(fetch "${url}")"
+		if grep -qF '"tab_home"' <<<"${page}"
+		then
+			# Publicly accessible profile
+			grep -Po '"website_url":"\K[^"]+' <<<"${page}" | sed 's,\\/,/,g' | awk '!seen[$0]++'
+		elif grep -qF 'id="pagelet_loggedout_sign_up"' <<< "${page}"
+		then
+			# Profile overview only
+			grep -Po 'href="https://l\.facebook\.com/l\.php\?u=\K[^&]+' <<<"${page}" | sed 's,%3A,:,g; s,%2F,/,g'
+		fi
+	elif [[ "${url}" == *'instagram.com/'* ]]
+	then
+		fetch "${url}" | grep -Po '"external_url":"\K[^"]+'
+		sleep 3 # To avoid getting banned
+	elif [[ "${url}" == *'twitter.com/'* ]]
+	then
+		fetch "${url}" | tr -d '\n' | grep -Po '<div\s+([^>]*\s)?class\s*=\s*"([^"]*\s)?ProfileHeaderCard-url(\s[^"]*)?">.*?</div>' | grep -Po '<a\s(?=([^>]*\s)?class\s*=\s*"([^"]*\s)?u-textUserColor(\s[^"]*)?")([^>]*\s)?title="\K[^"]+'
+	elif [[ "${url}" == *'youtube.com/'* ]]
+	then
+		if [[ "${url}" == *'?'* ]]; then u="${url}&disable_polymer=1"; else u="${url}?disable_polymer=1"; fi
+		fetch "${u}" | tr -d '\n' | grep -Po '<div\s([^>]*\s)?id\s*=\s*"header-links".*?</div>' | grep -Po 'href="/redirect\?([^"]*&(amp;)?)?q=\K[^&"]+' | sed 's,%3A,:,g; s,%2F,/,g; s,%25,%,g'
+	fi
+}
+
+{
+	for arg in "$@"
+	do
+		echo "${arg}"
+	done
+
+	if [ ! -t 0 ]
+	then
+		cat
+	fi
+} | while read -r url
+do
+	if [[ "${url}" == '* '* ]]
+	then
+		url="${url:2}"
+	fi
+	fetch_n_extract "${url}"
+done
