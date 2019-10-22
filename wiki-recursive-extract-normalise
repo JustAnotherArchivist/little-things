@@ -3,7 +3,7 @@
 # Everything that looks like a social media link (including YouTube) is run through social-media-extract-profile-link.
 # Everything else is run through website-extract-social-media.
 # This is done recursively until no new links are discovered anymore.
-# The output is further fed through url-normalise before, during, and after processing to avoid equivalent but slightly different duplicates.
+# The output is further fed through url-normalise before and during processing to avoid equivalent but slightly different duplicates.
 
 verbose=
 while [[ $# -gt 0 ]]
@@ -80,4 +80,4 @@ do
 			done
 		done
 	fi
-done | stderr_annotate 'url-normalise/after' "${scriptpath}/url-normalise" ${verbose}
+done
