@@ -47,7 +47,14 @@ do
 		url="${line}"
 	fi
 
-	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|pg/[^/]+([/?]|$)|profile\.php\?id=[0-9]+(&|$)) ]]
+	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/login/.*[?\&]next=https?%3A%2F%2F((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com%2F && "${url}" != *'%0A'* && "${url}" != *'%00'* ]]
+	then
+		url="${url##*\?next=}"
+		url="${url##*&next=}"
+		url="${url%%&*}"
+		url="$(printf '%b' "${url//%/\\x}")"
+	fi
+	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/([^/]+/?(\?|$)|pages/[^/]+/[0-9]+/?(\?|$)|pages/category/[^/]+/[^/]+/?(\?|$)|pg/[^/]+([/?]|$)|profile\.php\?id=[0-9]+(&|$)) ]]
 	then
 		verbose_echo "Normalising Facebook URL: ${url}" >&2
 		if [[ "${url}" == *profile.php* ]]
