@@ -51,6 +51,11 @@ do
 			url="${url%% | *}"
 		fi
 
+		if [[ "${sectionUrls[${url}]}" ]]
+		then
+			# Processed already, skip
+			continue
+		fi
 		sectionUrls["${url}"]=1
 		toProcess=("${url}")
 		while [[ ${#toProcess[@]} -gt 0 ]]
