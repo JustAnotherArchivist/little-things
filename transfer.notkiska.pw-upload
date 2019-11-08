@@ -1,2 +1,2 @@
 #!/bin/bash
-curl -s --upload-file "$1" https://transfer.notkiska.pw/ | sed 's,%40,@,g'; echo
+curl -sv --upload-file "$1" https://transfer.notkiska.pw/ 2> >(grep -Po -m 1 '< X-Url-\KDelete: .*' >&2) | sed 's,%40,@,g'; echo
