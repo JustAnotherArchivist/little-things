@@ -1,0 +1,18 @@
+#!/bin/bash
+declare -A uas
+uas["archivebot"]='ArchiveTeam ArchiveBot/20190427.01 (wpull 2.0.3) and not Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36'
+uas["firefox"]='Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0'
+
+if [[ $# -eq 0 || "$1" == '-h' || "$1" == '--help' || -z "${uas[$1]+exists}" ]]
+then
+	echo "Usage: curl-ua NAME ARGS" >&2
+	echo "" >&2
+	echo "  NAME: name of a UA alias" >&2
+	echo "  ARGS: args for curl" >&2
+	exit 1
+fi
+
+ua="${uas[$1]}"
+shift
+
+curl -A "${ua}" "$@"
