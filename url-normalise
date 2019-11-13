@@ -81,7 +81,7 @@ do
 			fi
 		fi
 		echo "Failed to normalise Facebook URL: ${url}" >&2
-		echo "${prefix}${url}"
+		echo "${line}"
 	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+/?(\?.*)?$ ]]
 	then
 		verbose_echo "Normalising Twitter URL: ${url}" >&2
@@ -94,7 +94,7 @@ do
 			echo "${prefix}https://twitter.com/${user}"
 		else
 			echo "Failed to normalise Twitter URL: ${url}" >&2
-			echo "${prefix}${url}"
+			echo "${line}"
 		fi
 	elif [[ "${url}" =~ ^https?://(www\.)?instagram\.com/[^/]+/?$ ]]
 	then
@@ -123,7 +123,7 @@ do
 				echo "${prefix}https://www.youtube.com/${canonical}"
 			else
 				echo "Failed to normalise YouTube URL: ${url}" >&2
-				echo "${prefix}${url}"
+				echo "${line}"
 			fi
 		fi
 	else
@@ -134,7 +134,7 @@ do
 			echo "${prefix}${canonical}"
 		else
 			echo "Failed to normalise other URL: ${url}" >&2
-			echo "${prefix}${url}"
+			echo "${line}"
 		fi
 	fi
 done
