@@ -84,6 +84,12 @@ do
 		echo "${line}"
 	elif [[ "${url}" =~ ^https?://(www\.)?twitter\.com/[^/]+/?(\?.*)?$ ]]
 	then
+		if [[ "${url}" =~ ^https?://(www\.)?twitter\.com/(i|web|search|hashtag)[/?] ]]
+		then
+			verbose_echo "Leaving Twitter URL alone: ${url}" >&2
+			echo "${line}"
+			continue
+		fi
 		verbose_echo "Normalising Twitter URL: ${url}" >&2
 		url="${url%%\?*}"
 		url="${url%/}"
@@ -98,6 +104,12 @@ do
 		fi
 	elif [[ "${url}" =~ ^https?://(www\.)?instagram\.com/[^/]+/?$ ]]
 	then
+		if [[ "${url}" =~ ^https?://(www\.)?instagram\.com/(p|explore)/ ]]
+		then
+			verbose_echo "Leaving Instagram URL alone: ${url}" >&2
+			echo "${line}"
+			continue
+		fi
 		verbose_echo "Normalising Instagram URL: ${url}" >&2
 		user="${url%/}"
 		user="${user##*/}"
