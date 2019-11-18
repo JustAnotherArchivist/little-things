@@ -10,7 +10,7 @@ function verbose_echo {
 
 function fetch {
 	verbose_echo "Fetching $1" >&2
-	curl -sL -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "$1"
+	curl -sL --max-time 10 -A 'Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0' "$1"
 }
 
 function fetch_n_extract {
