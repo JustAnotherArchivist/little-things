@@ -16,7 +16,7 @@ args = []
 while i < len(sys.argv):
 	arg = sys.argv[i]
 	if arg == '--help':
-		print('s3-bucket-list [options] HOSTNAME BUCKETNAME', file = sys.stderr)
+		print('s3-bucket-list [options] BUCKETURL', file = sys.stderr)
 		print('', file = sys.stderr)
 		print('Options:', file = sys.stderr)
 		print(f'  --format FORMAT    Modify the output format; FORMAT defaults to {format!r}; available fields: url, key, size, and all fields returned by S3 (e.g. LastModified)', file = sys.stderr)
@@ -39,15 +39,18 @@ while i < len(sys.argv):
 	else:
 		args.append(arg)
 	i += 1
-assert len(args) == 2, 'Need two arguments: hostname and bucketname'
-hostname, bucketname = args
+assert len(args) == 1, 'Need one argument: bucket URL'
+baseUrl = args[0]
+assert baseUrl.startswith('http://') or baseUrl.startswith('https://'), 'Argument does not look like an HTTP URL'
+if '/' not in baseUrl.split('://', 1)[1]:
+	baseUrl = f'{baseUrl}/'
+hostname = baseUrl.split('://', 1)[1].split('/', 1)[0]
 
 
 conn = http.client.HTTPSConnection(hostname)
 params = {}
 if startMarker is not None:
 	params['marker'] = startMarker
-baseUrl = f'https://{hostname}/{urllib.parse.quote(bucketname)}'
 while True:
 	queryString = urllib.parse.urlencode(params)
 	url = f'{baseUrl}{"?" + queryString if queryString else ""}'
