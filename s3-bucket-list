@@ -96,7 +96,10 @@ while True:
 
 		size = int(fields['Size']) if 'Size' in fields else None
 
-		print(format.format(**fields, key = key, url = url, size = size))
+		try:
+			print(format.format(**fields, key = key, url = url, size = size))
+		except BrokenPipeError:
+			sys.exit(0)
 	lastKey = key
 
 	truncated = True if b'<IsTruncated>true</IsTruncated>' in body else (False if b'<IsTruncated>false</IsTruncated>' in body else None)
