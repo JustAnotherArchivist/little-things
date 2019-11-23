@@ -43,7 +43,7 @@ while i < len(sys.argv):
 assert len(args) == 1, 'Need one argument: bucket URL'
 baseUrl = args[0]
 assert baseUrl.startswith('http://') or baseUrl.startswith('https://'), 'Argument does not look like an HTTP URL'
-if '/' not in baseUrl.split('://', 1)[1]:
+if '/' not in baseUrl.split('://', 1)[1] or not baseUrl.endswith('/'):
 	baseUrl = f'{baseUrl}/'
 hostname = baseUrl.split('://', 1)[1].split('/', 1)[0]
 
@@ -83,7 +83,7 @@ while True:
 	contents[-1] = contents[-1][:-len('</ListBucketResult>')]
 	for content in contents[1:]:
 		key = content[5 : content.index(b'</Key>')].decode('utf-8') # 5 = len(b'<Key>')
-		url = f'{baseUrl}/{urllib.parse.quote(key)}'
+		url = f'{baseUrl}{urllib.parse.quote(key)}'
 
 		tags = content.split(b'>')
 		assert len(tags) % 2 == 0
