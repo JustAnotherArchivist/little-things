@@ -2,6 +2,7 @@
 import html
 import http.client
 import os
+import shlex
 import sys
 import urllib.parse
 
@@ -51,6 +52,7 @@ conn = http.client.HTTPSConnection(hostname)
 params = {}
 if startMarker is not None:
 	params['marker'] = startMarker
+attempt = 1
 while True:
 	queryString = urllib.parse.urlencode(params)
 	url = f'{baseUrl}{"?" + queryString if queryString else ""}'
@@ -59,6 +61,14 @@ while True:
 	conn.request('GET', url[url.index('/', 8):])
 	resp = conn.getresponse()
 	body = resp.read()
+	if b'<Error><Code>InternalError</Code><Message>We encountered an internal error. Please try again.</Message>' in body:
+		print(f'Got internal error on {url} on attempt {attempt}; {"retrying" if attempt < 10 else "aborting"}', file = sys.stderr)
+		if attempt >= 10:
+			if 'marker' in params:
+				print(f'To retry, use --marker {shlex.quote(params["marker"])}', file = sys.stderr)
+			break
+		attempt += 1
+		continue
 	if not body.startswith(b'<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'):
 		raise RuntimeError(f'Invalid body: {body[:200]}...')
 
@@ -97,3 +107,4 @@ while True:
 	if 'marker' in params and params['marker'] == lastKey:
 		raise RuntimeError('Marker loop (same last key as previous marker)')
 	params['marker'] = lastKey
+	attempt = 1
