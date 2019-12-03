@@ -89,10 +89,18 @@ while True:
 		assert len(tags) % 2 == 0
 		assert tags[-1] == b''
 		assert tags[-2] == b'</Contents'
-		assert all(a[1:] == b[b.rindex(b'</') + 2:] for a, b in zip(tags[:-2:2], tags[1:-2:2]))
+		openTags = [] # Current open tag hierarchy
 		fields = {}
-		for a, b in zip(tags[:-2:2], tags[1:-2:2]):
-			fields[a[1:].decode('utf-8')] = html.unescape(b[:b.rindex(b'</')].decode('utf-8'))
+		for tag in tags[:-2]:
+			if tag.startswith(b'<'):
+				openTags.append(tag[1:])
+				continue
+			assert openTags
+			if tag.endswith(b'</' + openTags[-1]):
+				fields[b'>'.join(openTags).decode('utf-8')] = html.unescape(tag[:-(len(openTags[-1]) + 2)].decode('utf-8'))
+				openTags.pop()
+				continue
+			assert False
 
 		size = int(fields['Size']) if 'Size' in fields else None
 
