@@ -82,7 +82,7 @@ while True:
 	assert contents[-1].endswith(b'</Contents></ListBucketResult>')
 	contents[-1] = contents[-1][:-len('</ListBucketResult>')]
 	for content in contents[1:]:
-		key = content[5 : content.index(b'</Key>')].decode('utf-8') # 5 = len(b'<Key>')
+		key = html.unescape(content[5 : content.index(b'</Key>')].decode('utf-8')) # 5 = len(b'<Key>')
 		url = f'{baseUrl}{urllib.parse.quote(key)}'
 
 		tags = content.split(b'>')
