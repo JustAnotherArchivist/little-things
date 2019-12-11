@@ -140,7 +140,7 @@ def iter_warc(f):
 					gzipped = False
 					if b'\r\ntransfer-encoding' in httpHeaders.lower():
 						transferEncoding = next(x[1] for x in httpHeaderLines if x[0].lower() == b'transfer-encoding')
-						transferEncodings = map(bytes.strip, transferEncoding.split(b','))
+						transferEncodings = set(map(bytes.strip, transferEncoding.split(b',')))
 						chunked = b'chunked' in transferEncodings
 						gzipped = b'gzip' in transferEncodings
 
