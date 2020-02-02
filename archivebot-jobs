@@ -19,14 +19,14 @@ while [[ $# -gt 0 ]]
 do
 	if [[ "$1" == "--help" || "$1" == "-h" ]]
 	then
-		echo "Usage: archivebot-jobs [--help|-h] [(--sort|-s) COLUMN] [(--filter|-f) COLUMN=VALUE] [--no-colours|--no-colors] [--no-table]" >&2
+		echo "Usage: archivebot-jobs [options]" >&2
 		echo "Prints a table of current AB jobs" >&2
 		echo "Options:" >&2
-		echo "  --help, -h: Show this message and exit." >&2
-		echo "  --sort COLUMN: Sort the table by a column. This can be used multiple times to refine the sorting." >&2
-		echo "  --filter COLUMN=VALUE: Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
-		echo "  --no-colours: Don't colourise the last activity column if it's been a while." >&2
-		echo "  --no-table: Raw output without feeding through column(1); columns are separated by tabs." >&2
+		echo "  --help, -h                  Show this message and exit." >&2
+		echo "  --sort COLUMN, -s           Sort the table by a column. This can be used multiple times to refine the sorting." >&2
+		echo "  --filter COLUMN=VALUE, -f   Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
+		echo "  --no-colours, --no-colors   Don't colourise the last activity column if it's been a while." >&2
+		echo "  --no-table                  Raw output without feeding through column(1); columns are separated by tabs." >&2
 		echo "The COLUMNs are the names of each column, printed in capital letters in the first line of the output." >&2
 		exit 0
 	elif [[ "$1" == "--sort" || "$1" == "-s" ]]
