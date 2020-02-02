@@ -1,0 +1,167 @@
+#!/bin/bash
+columns=("JOBID" "URL" "USER" "PIPENICK" "QUEUED" "STARTED" "LAST ACTIVE") # Duplicated in Python code!
+
+function valid_column {
+	local candidate="$1"
+	local column
+	for column in "${columns[@]}"
+	do
+		[[ "${candidate}" == "${column}" ]] && return 0
+	done
+	return 1
+}
+
+sortcolumns=()
+filter=
+nocolours=
+notable=
+while [[ $# -gt 0 ]]
+do
+	if [[ "$1" == "--help" || "$1" == "-h" ]]
+	then
+		echo "Usage: archivebot-jobs [--help|-h] [(--sort|-s) COLUMN] [(--filter|-f) COLUMN=VALUE] [--no-colours|--no-colors] [--no-table]" >&2
+		echo "Prints a table of current AB jobs" >&2
+		echo "Options:" >&2
+		echo "  --help, -h: Show this message and exit." >&2
+		echo "  --sort COLUMN: Sort the table by a column. This can be used multiple times to refine the sorting." >&2
+		echo "  --filter COLUMN=VALUE: Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
+		echo "  --no-colours: Don't colourise the last activity column if it's been a while." >&2
+		echo "  --no-table: Raw output without feeding through column(1); columns are separated by tabs." >&2
+		echo "The COLUMNs are the names of each column, printed in capital letters in the first line of the output." >&2
+		exit 0
+	elif [[ "$1" == "--sort" || "$1" == "-s" ]]
+	then
+		sortcolumns+=("$2")
+		shift
+	elif [[ "$1" == "--filter" || "$1" == "-f" ]]
+	then
+		filter="$2"
+		shift
+	elif [[ "$1" == "--no-colours" || "$1" == "--no-colors" ]]
+	then
+		nocolours=1
+	elif [[ "$1" == "--no-table" ]]
+	then
+		notable=1
+	else
+		echo "Unknown option: $1" >&2
+		exit 1
+	fi
+	shift
+done
+
+# Validate sortcolumns and filter
+if [[ "${filter}" ]]
+then
+	if [[ ! "${filter}" == *=* ]]
+	then
+		echo "Invalid filter: ${filter}" >&2
+		exit 1
+	fi
+	if [[ "${filter}" == *$'\n'* ]]
+	then
+		echo "Invalid filter: newlines not allowed" >&2
+		exit 1
+	fi
+	column="${filter%%=*}"
+	if ! valid_column "${column}"
+	then
+		echo "Invalid filter column: ${column}" >&2
+		exit 1
+	fi
+fi
+if [[ ${#sortcolumns[@]} -gt 0 ]]
+then
+	for column in "${sortcolumns[@]}"
+	do
+		if ! valid_column "${column}"
+		then
+			echo "Invalid sort column: ${column}" >&2
+			exit 1
+		fi
+	done
+else
+	# Default sort order
+	sortcolumns+=("JOBID")
+fi
+
+if [[ "${notable}" ]]
+then
+	column=("cat")
+else
+	column=("column" "-t" $'-s\t')
+fi
+
+jobdata="$(curl -s -H "Accept: application/json" "http://dashboard.at.ninjawedding.org/logs/recent?count=1" 2>/dev/null)"
+pipelinedata="$(curl -s -H "Accept: application/json" "http://dashboard.at.ninjawedding.org/pipelines" 2>/dev/null)"
+
+if [[ -z "${jobdata}" || -z "${pipelinedata}" ]]
+then
+	echo "Error retrieving job or pipeline data" >&2
+	exit 1
+fi
+
+{ echo "${jobdata}"; echo "${pipelinedata}"; echo "${filter}"; } | python3 -c \
+'
+if True: # For sensible indentation
+	import json
+	import sys
+	import time
+
+	def time_ago(diff):
+		if diff <= 0:
+			return "now"
+		elif diff < 60:
+			return "<1 min ago"
+		elif diff < 86400:
+			return (f"{diff // 3600:.0f}h " if diff >= 3600 else "") + f"{(diff % 3600) // 60:.0f}mn ago"
+		else:
+			return f"{diff // 86400:.0f}d {(diff % 86400) // 3600:.0f}h ago"
+
+	def coloured_time_ago(diff):
+		if diff >= 300:
+			return "\x1b[0;31m" + time_ago(diff) + "\x1b[0m"
+		else:
+			return time_ago(diff)
+
+	jobdata = json.loads(sys.stdin.readline())
+	pipelinedata = json.loads(sys.stdin.readline())
+	filter = sys.stdin.readline().strip()
+
+	pipelines = {p["id"]: p["nickname"] for p in pipelinedata["pipelines"]}
+
+	columns = ("JOBID", "URL", "USER", "PIPENICK", "QUEUED", "STARTED", "LAST ACTIVE") # Duplicated in Bash code!
+	jobs = []
+	currentTime = time.time()
+	for j in jobdata:
+		jobs.append([
+			j["job_data"]["ident"],
+			j["job_data"]["url"],
+			j["job_data"]["started_by"],
+			pipelines[j["job_data"]["pipeline_id"]] if j["job_data"]["pipeline_id"] in pipelines else "unknown",
+			currentTime - j["job_data"]["queued_at"],
+			currentTime - j["job_data"]["started_at"],
+			currentTime - j["ts"],
+		])
+
+	# Filter
+	if filter:
+		column, value = filter.split("=", 1)
+		assert column in columns
+		columnIdx = columns.index(column)
+		jobs = [job for job in jobs if job[columnIdx] == value]
+
+	# Sort
+	sortColumns = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
+	assert all(column in columns for column in sortColumns)
+	sortColumnIdxs = tuple(columns.index(column) for column in sortColumns)
+	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] for columnIdx in sortColumnIdxs))
+
+	# Print
+	print("\t".join(columns))
+	for job in jobs:
+		job[4] = time_ago(job[4])
+		job[5] = time_ago(job[5])
+		job[6] = (coloured_time_ago if not "'${nocolours}'" else time_ago)(job[6])
+		print("\t".join(job))
+' | "${column[@]}"
