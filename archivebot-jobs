@@ -162,6 +162,8 @@ if True: # For sensible indentation
 			"^": lambda a, b: a.startswith(b),
 			"$": lambda a, b: a.endswith(b),
 		}[filterDict["op"]]
+		if isinstance(jobs[0][columnIdx], (int, float)):
+			filterDict["value"] = float(filterDict["value"])
 		jobs = [job for job in jobs if compFunc(job[columnIdx], filterDict["value"])]
 
 	# Sort
