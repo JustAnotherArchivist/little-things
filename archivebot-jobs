@@ -23,7 +23,7 @@ do
 		echo "Prints a table of current AB jobs" >&2
 		echo "Options:" >&2
 		echo "  --help, -h                  Show this message and exit." >&2
-		echo "  --sort COLUMN, -s           Sort the table by a column. This can be used multiple times to refine the sorting." >&2
+		echo "  --sort [-]COLUMN, -s        Sort the table by a column (descending if preceded by '-'). This can be used multiple times to refine the sorting." >&2
 		echo "  --filter FILTER, -f         Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
 		echo "                              The FILTER has this format: COLUMN{=|<|>|^|$}VALUE" >&2
 		echo "                              = means the value must be exactly as specified; < and > mean it must be less/greater than the specified; ^ and $ mean it must start/end with the specified." >&2
@@ -76,6 +76,7 @@ if [[ ${#sortcolumns[@]} -gt 0 ]]
 then
 	for column in "${sortcolumns[@]}"
 	do
+		column="${column#-}"
 		if ! valid_column "${column^^}"
 		then
 			echo "Invalid sort column: ${column}" >&2
@@ -164,10 +165,20 @@ if True: # For sensible indentation
 		jobs = [job for job in jobs if compFunc(job[columnIdx], filterDict["value"])]
 
 	# Sort
+	class reversor: # https://stackoverflow.com/a/56842689
+		def __init__(self, obj):
+			self.obj = obj
+
+		def __eq__(self, other):
+			return other.obj == self.obj
+
+		def __lt__(self, other):
+			return other.obj < self.obj
+
 	sortColumns = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
-	assert all(column.upper() in columns for column in sortColumns)
-	sortColumnIdxs = tuple(columns.index(column.upper()) for column in sortColumns)
-	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] for columnIdx in sortColumnIdxs))
+	assert all(column.lstrip("-").upper() in columns for column in sortColumns)
+	sortColumnIdxs = tuple(columns.index(column.lstrip("-").upper()) for column in sortColumns)
+	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] if not column.startswith("-") else reversor(job[columnIdx]) for column, columnIdx in zip(sortColumns, sortColumnIdxs)))
 
 	# Print
 	print("\t".join(columns))
