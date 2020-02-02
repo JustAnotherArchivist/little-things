@@ -123,7 +123,7 @@ if True: # For sensible indentation
 
 	def coloured_time_ago(diff):
 		if diff >= 300:
-			return "\x1b[0;31m" + time_ago(diff) + "\x1b[0m"
+			return f"\x1b[{0 if diff < 6 * 3600 else 7};31m" + time_ago(diff) + "\x1b[0m"
 		else:
 			return time_ago(diff)
 
