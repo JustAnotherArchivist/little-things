@@ -24,7 +24,9 @@ do
 		echo "Options:" >&2
 		echo "  --help, -h                  Show this message and exit." >&2
 		echo "  --sort COLUMN, -s           Sort the table by a column. This can be used multiple times to refine the sorting." >&2
-		echo "  --filter COLUMN=VALUE, -f   Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
+		echo "  --filter FILTER, -f         Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
+		echo "                              The FILTER has this format: COLUMN{=|<|>|^|$}VALUE" >&2
+		echo "                              = means the value must be exactly as specified; < and > mean it must be less/greater than the specified; ^ and $ mean it must start/end with the specified." >&2
 		echo "  --no-colours, --no-colors   Don't colourise the last activity column if it's been a while." >&2
 		echo "  --no-table                  Raw output without feeding through column(1); columns are separated by tabs." >&2
 		echo "The COLUMNs are the names of each column, printed in capital letters in the first line of the output." >&2
@@ -53,17 +55,17 @@ done
 # Validate sortcolumns and filter
 if [[ "${filter}" ]]
 then
-	if [[ ! "${filter}" == *=* ]]
-	then
-		echo "Invalid filter: ${filter}" >&2
-		exit 1
-	fi
 	if [[ "${filter}" == *$'\n'* ]]
 	then
 		echo "Invalid filter: newlines not allowed" >&2
 		exit 1
 	fi
-	column="${filter%%=*}"
+	if [[ ! ( "${filter}" == *'='* || "${filter}" == *'<'* || "${filter}" == *'>'* || "${filter}" == *'^'* || "${filter}" == *'$'* ) ]]
+	then
+		echo "Invalid filter: ${filter}" >&2
+		exit 1
+	fi
+	column="${filter%%[=<>^$]*}"
 	if ! valid_column "${column}"
 	then
 		echo "Invalid filter column: ${column}" >&2
@@ -146,10 +148,20 @@ if True: # For sensible indentation
 
 	# Filter
 	if filter:
-		column, value = filter.split("=", 1)
-		assert column in columns
-		columnIdx = columns.index(column)
-		jobs = [job for job in jobs if job[columnIdx] == value]
+		import re
+		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^$])(?P<value>.*)$", filter)
+		filterDict = match.groupdict()
+		filterDict["column"] = filterDict["column"]
+		assert filterDict["column"] in columns
+		columnIdx = columns.index(filterDict["column"])
+		compFunc = {
+			"=": lambda a, b: a == b,
+			"<": lambda a, b: a < b,
+			">": lambda a, b: a > b,
+			"^": lambda a, b: a.startswith(b),
+			"$": lambda a, b: a.endswith(b),
+		}[filterDict["op"]]
+		jobs = [job for job in jobs if compFunc(job[columnIdx], filterDict["value"])]
 
 	# Sort
 	sortColumns = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
