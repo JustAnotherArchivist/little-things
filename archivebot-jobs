@@ -66,7 +66,7 @@ then
 		exit 1
 	fi
 	column="${filter%%[=<>^$]*}"
-	if ! valid_column "${column}"
+	if ! valid_column "${column^^}"
 	then
 		echo "Invalid filter column: ${column}" >&2
 		exit 1
@@ -76,7 +76,7 @@ if [[ ${#sortcolumns[@]} -gt 0 ]]
 then
 	for column in "${sortcolumns[@]}"
 	do
-		if ! valid_column "${column}"
+		if ! valid_column "${column^^}"
 		then
 			echo "Invalid sort column: ${column}" >&2
 			exit 1
@@ -151,7 +151,7 @@ if True: # For sensible indentation
 		import re
 		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^$])(?P<value>.*)$", filter)
 		filterDict = match.groupdict()
-		filterDict["column"] = filterDict["column"]
+		filterDict["column"] = filterDict["column"].upper()
 		assert filterDict["column"] in columns
 		columnIdx = columns.index(filterDict["column"])
 		compFunc = {
@@ -165,8 +165,8 @@ if True: # For sensible indentation
 
 	# Sort
 	sortColumns = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
-	assert all(column in columns for column in sortColumns)
-	sortColumnIdxs = tuple(columns.index(column) for column in sortColumns)
+	assert all(column.upper() in columns for column in sortColumns)
+	sortColumnIdxs = tuple(columns.index(column.upper()) for column in sortColumns)
 	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] for columnIdx in sortColumnIdxs))
 
 	# Print
