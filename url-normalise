@@ -94,7 +94,7 @@ do
 		url="${url%%\?*}"
 		url="${url%/}"
 		unnormalisedUser="${url##*/}"
-		user="$(curl -sL --max-time 10 -A "${userAgent}" "https://twitter.com/${unnormalisedUser}" | grep -Po '<a class="([^"]*\s)?ProfileHeaderCard-screennameLink(\s[^"]*)?" href="/\K[^/"]+(?=")')"
+		user="$(curl -sL --max-time 10 -A "Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.18" "https://twitter.com/${unnormalisedUser}" | grep -Po '<a class="([^"]*\s)?ProfileHeaderCard-screennameLink(\s[^"]*)?" href="/\K[^/"]+(?=")')"
 		if [[ "${user}" ]]
 		then
 			echo "${prefix}https://twitter.com/${user}"
