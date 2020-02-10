@@ -177,6 +177,9 @@ if True: # For sensible indentation
 		transform = lambda x: x.lower() if "'${filtercaseinsensitive}'" and isinstance(x, str) else x
 		jobs = [job for job in jobs if compFunc(transform(job[columnIdx]), transform(filterDict["value"]))]
 
+	if not jobs:
+		sys.exit(0)
+
 	# Sort
 	class reversor: # https://stackoverflow.com/a/56842689
 		def __init__(self, obj):
