@@ -26,8 +26,8 @@ do
 		echo "  --help, -h                  Show this message and exit." >&2
 		echo "  --sort [-]COLUMN, -s        Sort the table by a column (descending if preceded by '-'). This can be used multiple times to refine the sorting." >&2
 		echo "  --filter FILTER, -f         Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
-		echo "                              The FILTER has this format: COLUMN{=|<|>|^|$}VALUE" >&2
-		echo "                              = means the value must be exactly as specified; < and > mean it must be less/greater than the specified; ^ and $ mean it must start/end with the specified." >&2
+		echo "                              The FILTER has this format: COLUMN{=|<|>|^|*|$|~}VALUE" >&2
+		echo "                              = means the value must be exactly as specified; < and > mean it must be less/greater than the specified; ^ and $ mean it must start/end with the specified; * means it must contain the specified; ~ means it must match the specified regex." >&2
 		echo "  --ifilter FILTER, -i        Like --filter, but case-insensitive" >&2
 		echo "  --no-colours, --no-colors   Don't colourise the last activity column if it's been a while." >&2
 		echo "  --no-table                  Raw output without feeding through column(1); columns are separated by tabs." >&2
@@ -68,12 +68,12 @@ then
 		echo "Invalid filter: newlines not allowed" >&2
 		exit 1
 	fi
-	if [[ ! ( "${filter}" == *'='* || "${filter}" == *'<'* || "${filter}" == *'>'* || "${filter}" == *'^'* || "${filter}" == *'$'* ) ]]
+	if [[ ! ( "${filter}" == *'='* || "${filter}" == *'<'* || "${filter}" == *'>'* || "${filter}" == *'^'* || "${filter}" == *'*'* || "${filter}" == *'$'* || "${filter}" == *'~'* ) ]]
 	then
 		echo "Invalid filter: ${filter}" >&2
 		exit 1
 	fi
-	column="${filter%%[=<>^$]*}"
+	column="${filter%%[=<>^*$~]*}"
 	if ! valid_column "${column^^}"
 	then
 		echo "Invalid filter column: ${column}" >&2
@@ -158,7 +158,7 @@ if True: # For sensible indentation
 	# Filter
 	if filter:
 		import re
-		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^$])(?P<value>.*)$", filter)
+		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^*$~])(?P<value>.*)$", filter)
 		filterDict = match.groupdict()
 		filterDict["column"] = filterDict["column"].upper()
 		assert filterDict["column"] in columns
@@ -168,7 +168,9 @@ if True: # For sensible indentation
 			"<": lambda a, b: a < b,
 			">": lambda a, b: a > b,
 			"^": lambda a, b: a.startswith(b),
+			"*": lambda a, b: b in a,
 			"$": lambda a, b: a.endswith(b),
+			"~": lambda a, b: re.search(b, a) is not None,
 		}[filterDict["op"]]
 		if isinstance(jobs[0][columnIdx], (int, float)):
 			filterDict["value"] = float(filterDict["value"])
