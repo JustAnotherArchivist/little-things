@@ -13,6 +13,7 @@ function valid_column {
 
 sortcolumns=()
 filter=
+filtercaseinsensitive=
 nocolours=
 notable=
 while [[ $# -gt 0 ]]
@@ -27,6 +28,7 @@ do
 		echo "  --filter FILTER, -f         Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used." >&2
 		echo "                              The FILTER has this format: COLUMN{=|<|>|^|$}VALUE" >&2
 		echo "                              = means the value must be exactly as specified; < and > mean it must be less/greater than the specified; ^ and $ mean it must start/end with the specified." >&2
+		echo "  --ifilter FILTER, -i        Like --filter, but case-insensitive" >&2
 		echo "  --no-colours, --no-colors   Don't colourise the last activity column if it's been a while." >&2
 		echo "  --no-table                  Raw output without feeding through column(1); columns are separated by tabs." >&2
 		echo "The COLUMNs are the names of each column, printed in capital letters in the first line of the output." >&2
@@ -38,6 +40,12 @@ do
 	elif [[ "$1" == "--filter" || "$1" == "-f" ]]
 	then
 		filter="$2"
+		filtercaseinsensitive=
+		shift
+	elif [[ "$1" == "--ifilter" || "$1" == "-i" ]]
+	then
+		filter="$2"
+		filtercaseinsensitive=1
 		shift
 	elif [[ "$1" == "--no-colours" || "$1" == "--no-colors" ]]
 	then
@@ -164,7 +172,8 @@ if True: # For sensible indentation
 		}[filterDict["op"]]
 		if isinstance(jobs[0][columnIdx], (int, float)):
 			filterDict["value"] = float(filterDict["value"])
-		jobs = [job for job in jobs if compFunc(job[columnIdx], filterDict["value"])]
+		transform = lambda x: x.lower() if "'${filtercaseinsensitive}'" and isinstance(x, str) else x
+		jobs = [job for job in jobs if compFunc(transform(job[columnIdx]), transform(filterDict["value"]))]
 
 	# Sort
 	class reversor: # https://stackoverflow.com/a/56842689
