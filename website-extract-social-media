@@ -10,42 +10,42 @@ function fetch_n_extract {
 		  tee \
 			>(
 			  # Facebook
-			  grep -Poi 'facebook\.com/(pages/[^/ <"'"'"']+/|groups/|pg/)?[^/ <"'"'"']+' | \
+			  grep -Poi 'facebook\.com/(pages/((?!&quot;)[^/ <"'"'"'])+/|groups/|pg/)?((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^,https://www.,' | \
 			  grep -vi -e '^https://www\.facebook\.com/2008$' -e '^https://www\.facebook\.com/tr\?' -e '^https://www\.facebook\.com/plugins$' -e '^https://www\.facebook\.com/l\.php\?' | \
 			  grep -Pvi '^https://www\.facebook\.com/share(r(\.php)?)?(\?|$)'
 			) \
 			>(
 			  # Flickr
-			  grep -Poi 'flickr\.com/photos/[^/ <"'"'"']+' | \
+			  grep -Poi 'flickr\.com/photos/((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^,https://www.,'
 			) \
 			>(
 			  # Instagram
-			  grep -Poi 'instagram\.com/(p/)?[^/ <"'"'"']+' | \
+			  grep -Poi 'instagram\.com/(p/)?((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^,https://www.,' | \
 			  grep -Pvi -e '^https://www\.instagram\.com/v?p$'
 			) \
 			>(
 			  # Telegram
-			  grep -Poi '//(www\.)?t\.me/[^/ <"'"'"']+' | \
+			  grep -Poi '//(www\.)?t\.me/((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^//,,; s,^www\.,,; s,^,https://,'
 			) \
 			>(
 			  # Twitter
-			  grep -Poi 'twitter\.com/(#!/)?(hashtag/)?[^/ <"'"'"']+' | \
+			  grep -Poi 'twitter\.com/(#!/)?(hashtag/)?((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^twitter\.com/#!/,twitter.com/,; s,^,https://,' | \
 			  grep -vi -e '^https://twitter\.com/home\?' -e '^https://twitter\.com/widgets\.js$' -e '^https://twitter\.com/share\?' -e '^https://twitter\.com/intent$' | \
 			  sed 's,\([?&]\)ref_src=[^&]\+&\?,\1,; s,?$,,'
 			) \
 			>(
 			  # VKontakte
-			  grep -Poi 'vk\.com/[^/ <"'"'"']+' | \
+			  grep -Poi 'vk\.com/((?!&quot;)[^/ <"'"'"'])+' | \
 			  sed 's,^,https://,'
 			) \
 			>(
 			  # YouTube
-			  grep -Poi '(youtube\.com/((user|channel|embed)/)?[^/ <"'"'"']+|youtu\.be/[^/ <"'"'"']+)' | \
+			  grep -Poi '(youtube\.com/((user|channel|embed)/)?((?!&quot;)[^/ <"'"'"'])+|youtu\.be/((?!&quot;)[^/ <"'"'"'])+)' | \
 			  awk '/^youtube/ { print "https://www." $0 }  /^youtu\.be/ { print "https://" $0 }' | \
 			  grep -vi -e '^https://www\.youtube\.com/vi$'
 			) \
