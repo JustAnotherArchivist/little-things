@@ -47,6 +47,14 @@ do
 		url="${line}"
 	fi
 
+	if [[ "${url}" == *' | '* ]]
+	then
+		suffix=" | ${url#* | }"
+		url="${url%% | *}"
+	else
+		suffix=""
+	fi
+
 	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/login/.*[?\&]next=https?%3A%2F%2F((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com%2F && "${url}" != *'%0A'* && "${url}" != *'%00'* ]]
 	then
 		url="${url##*\?next=}"
@@ -67,7 +75,7 @@ do
 		user="$(grep -Po '<div\s[^>]*(?<=\s)data-key\s*=\s*"tab_home".*?</div>' <<< "${page}" | grep -Po '<a\s[^>]*(?<=\s)href="/\K[^/]+')"
 		if [[ "${user}" ]]
 		then
-			echo "${prefix}https://www.facebook.com/${user}/"
+			echo "${prefix}https://www.facebook.com/${user}/${suffix}"
 			continue
 		elif grep -q 'id="pagelet_loggedout_sign_up"' <<< "${page}"
 		then
@@ -76,7 +84,7 @@ do
 			user="$(grep -Po '<link rel="canonical" href="\K[^"]+' <<< "${page}")"
 			if [[ "${user}" ]]
 			then
-				echo "${prefix}${user}"
+				echo "${prefix}${user}${suffix}"
 				continue
 			fi
 		fi
@@ -97,7 +105,7 @@ do
 		user="$(curl -sL --max-time 10 -A "Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.18" "https://twitter.com/${unnormalisedUser}" | grep -Po '<a class="([^"]*\s)?ProfileHeaderCard-screennameLink(\s[^"]*)?" href="/\K[^/"]+(?=")')"
 		if [[ "${user}" ]]
 		then
-			echo "${prefix}https://twitter.com/${user}"
+			echo "${prefix}https://twitter.com/${user}${suffix}"
 		else
 			echo "Failed to normalise Twitter URL: ${url}" >&2
 			echo "${line}"
@@ -113,7 +121,7 @@ do
 		verbose_echo "Normalising Instagram URL: ${url}" >&2
 		user="${url%/}"
 		user="${user##*/}"
-		echo "${prefix}https://www.instagram.com/${user,,}/"
+		echo "${prefix}https://www.instagram.com/${user,,}/${suffix}"
 	elif [[ "${url}" =~ ^https?://(www\.)?youtube\.com/ ]]
 	then
 		verbose_echo "Normalising YouTube URL: ${url}" >&2
@@ -127,12 +135,12 @@ do
 		canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kuser/[^"]+' <<< "${page}")"
 		if [[ "${canonical}" ]]
 		then
-			echo "${prefix}https://www.youtube.com/${canonical}"
+			echo "${prefix}https://www.youtube.com/${canonical}${suffix}"
 		else
 			canonical="$(grep -Po '<link itemprop="url" href="http://www\.youtube\.com/\Kchannel/[^"]+' <<< "${page}")"
 			if [[ "${canonical}" ]]
 			then
-				echo "${prefix}https://www.youtube.com/${canonical}"
+				echo "${prefix}https://www.youtube.com/${canonical}${suffix}"
 			else
 				echo "Failed to normalise YouTube URL: ${url}" >&2
 				echo "${line}"
@@ -143,7 +151,7 @@ do
 		canonical="$(curl -sS ${otherCurlRedirectOpt} --max-time 10 -A "${userAgent}" -o /dev/null -w '%{url_effective}' "${url}")"
 		if [[ "${canonical}" ]]
 		then
-			echo "${prefix}${canonical}"
+			echo "${prefix}${canonical}${suffix}"
 		else
 			echo "Failed to normalise other URL: ${url}" >&2
 			echo "${line}"
