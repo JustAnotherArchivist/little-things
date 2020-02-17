@@ -45,7 +45,7 @@ function fetch_n_extract {
 			) \
 			>(
 			  # YouTube
-			  grep -Poi '(youtube\.com/((user|channel|embed)/)?((?!&quot;)[^/ <"'"'"'])+|youtu\.be/((?!&quot;)[^/ <"'"'"'])+)' | \
+			  grep -Poi '(youtube\.com/((user|channel|c|embed)/)?((?!&quot;)[^/ <"'"'"'])+|youtu\.be/((?!&quot;)[^/ <"'"'"'])+)' | \
 			  awk '/^youtube/ { print "https://www." $0 }  /^youtu\.be/ { print "https://" $0 }' | \
 			  grep -vi -e '^https://www\.youtube\.com/vi$'
 			) \
