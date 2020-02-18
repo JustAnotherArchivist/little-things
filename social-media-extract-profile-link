@@ -25,7 +25,7 @@ function fetch_n_extract {
 		elif grep -qF 'id="pagelet_loggedout_sign_up"' <<< "${page}"
 		then
 			# Profile overview only
-			grep -Po '<div\s([^<]*\s)?id\s*=\s*"pagelet_contact".*<div\s([^<]*\s)?id\s*=\s*"bottomContent"' <<<"${page}" | grep -Po 'href="https://l\.facebook\.com/l\.php\?u=\K[^&]+' | sed 's,%3A,:,g; s,%2F,/,g'
+			grep -Po '<div\s([^<]*\s)?id\s*=\s*"pagelet_contact".*<div\s([^<]*\s)?id\s*=\s*"bottomContent"' <<<"${page}" | grep -Po 'href="https://l\.facebook\.com/l\.php\?u=\K[^&]+' | python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote(sys.stdin.read()))'
 		fi
 	elif [[ "${url}" == *'instagram.com/'* ]]
 	then
@@ -37,7 +37,7 @@ function fetch_n_extract {
 	elif [[ "${url}" == *'youtube.com/'* ]]
 	then
 		if [[ "${url}" == *'?'* ]]; then u="${url}&disable_polymer=1"; else u="${url}?disable_polymer=1"; fi
-		fetch "${u}" | tr -d '\n' | grep -Po '<div\s([^>]*\s)?id\s*=\s*"header-links".*?</div>' | grep -Po 'href="/redirect\?([^"]*&(amp;)?)?q=\K[^&"]+' | sed 's,%3A,:,g; s,%2F,/,g; s,%25,%,g'
+		fetch "${u}" | tr -d '\n' | grep -Po '<div\s([^>]*\s)?id\s*=\s*"header-links".*?</div>' | grep -Po 'href="/redirect\?([^"]*&(amp;)?)?q=\K[^&"]+' | python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote(sys.stdin.read()))'
 	fi
 }
 
