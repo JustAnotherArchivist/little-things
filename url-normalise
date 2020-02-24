@@ -55,6 +55,14 @@ do
 		suffix=""
 	fi
 
+	# Normalise domain
+	if [[ "${url}" =~ ^https?://.*/ ]]
+	then
+		domain="${url#*://}"
+		domain="${domain%%/*}"
+		url="${url%%://*}://${domain,,}/${url#*://*/}"
+	fi
+
 	if [[ "${url}" =~ ^https?://((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com/login/.*[?\&]next=https?%3A%2F%2F((www|m|[a-z][a-z]-[a-z][a-z]).)?facebook.com%2F && "${url}" != *'%0A'* && "${url}" != *'%00'* ]]
 	then
 		url="${url##*\?next=}"
