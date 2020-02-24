@@ -21,7 +21,7 @@ function fetch_n_extract {
 		if grep -qF '"tab_home"' <<<"${page}"
 		then
 			# Publicly accessible profile
-			grep -Po '"website_url":"\K[^"]+' <<<"${page}" | sed 's,\\/,/,g' | awk '!seen[$0]++'
+			grep -Po '"website_url":\K"[^"]+"' <<<"${page}" | python3 -c 'import json, sys'$'\n''for line in sys.stdin:'$'\n'' print(json.loads(line))' | awk '!seen[$0]++'
 		elif grep -qF 'id="pagelet_loggedout_sign_up"' <<< "${page}"
 		then
 			# Profile overview only
