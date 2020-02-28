@@ -16,6 +16,7 @@ filter=
 filtercaseinsensitive=
 nocolours=
 notable=
+dates= # Whether to use full dates for the time columns rather than expired time strings
 while [[ $# -gt 0 ]]
 do
 	if [[ "$1" == "--help" || "$1" == "-h" ]]
@@ -31,6 +32,7 @@ do
 		echo "  --ifilter FILTER, -i        Like --filter, but case-insensitive" >&2
 		echo "  --no-colours, --no-colors   Don't colourise the last activity column if it's been a while." >&2
 		echo "  --no-table                  Raw output without feeding through column(1); columns are separated by tabs." >&2
+		echo "  --dates                     Print dates instead of elapsed times for queued/started/last active columns." >&2
 		echo "The COLUMNs are the names of each column, printed in capital letters in the first line of the output." >&2
 		exit 0
 	elif [[ "$1" == "--sort" || "$1" == "-s" ]]
@@ -53,6 +55,9 @@ do
 	elif [[ "$1" == "--no-table" ]]
 	then
 		notable=1
+	elif [[ "$1" == "--dates" ]]
+	then
+		dates=1
 	else
 		echo "Unknown option: $1" >&2
 		exit 1
@@ -115,25 +120,27 @@ fi
 { echo "${jobdata}"; echo "${pipelinedata}"; echo "${filter}"; } | python3 -c \
 '
 if True: # For sensible indentation
+	import datetime
 	import json
 	import sys
 	import time
 
-	def time_ago(diff):
+	currentTime = time.time()
+	def render_date(ts, coloured = False):
+		global currentTime
+		diff = currentTime - ts
+		colourStr = f"\x1b[{0 if diff < 6 * 3600 else 7};31m" if coloured and diff >= 300 else ""
+		colourEndStr = "\x1b[0m" if colourStr else ""
+		if "'${dates}'":
+			return colourStr + datetime.datetime.fromtimestamp(ts).isoformat(sep = " ") + colourEndStr
 		if diff <= 0:
 			return "now"
 		elif diff < 60:
 			return "<1 min ago"
 		elif diff < 86400:
-			return (f"{diff // 3600:.0f}h " if diff >= 3600 else "") + f"{(diff % 3600) // 60:.0f}mn ago"
+			return colourStr + (f"{diff // 3600:.0f}h " if diff >= 3600 else "") + f"{(diff % 3600) // 60:.0f}mn ago" + colourEndStr
 		else:
-			return f"{diff // 86400:.0f}d {(diff % 86400) // 3600:.0f}h ago"
-
-	def coloured_time_ago(diff):
-		if diff >= 300:
-			return f"\x1b[{0 if diff < 6 * 3600 else 7};31m" + time_ago(diff) + "\x1b[0m"
-		else:
-			return time_ago(diff)
+			return colourStr + f"{diff // 86400:.0f}d {(diff % 86400) // 3600:.0f}h ago" + colourEndStr
 
 	jobdata = json.loads(sys.stdin.readline())
 	pipelinedata = json.loads(sys.stdin.readline())
@@ -143,16 +150,15 @@ if True: # For sensible indentation
 
 	columns = ("JOBID", "URL", "USER", "PIPENICK", "QUEUED", "STARTED", "LAST ACTIVE") # Duplicated in Bash code!
 	jobs = []
-	currentTime = time.time()
 	for j in jobdata:
 		jobs.append([
 			j["job_data"]["ident"],
 			j["job_data"]["url"],
 			j["job_data"]["started_by"],
 			pipelines[j["job_data"]["pipeline_id"]] if j["job_data"]["pipeline_id"] in pipelines else "unknown",
-			currentTime - j["job_data"]["queued_at"],
-			currentTime - j["job_data"]["started_at"],
-			currentTime - j["ts"],
+			j["job_data"]["queued_at"],
+			j["job_data"]["started_at"],
+			int(j["ts"]),
 		])
 
 	# Filter
@@ -191,16 +197,20 @@ if True: # For sensible indentation
 		def __lt__(self, other):
 			return other.obj < self.obj
 
-	sortColumns = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
-	assert all(column.lstrip("-").upper() in columns for column in sortColumns)
-	sortColumnIdxs = tuple(columns.index(column.lstrip("-").upper()) for column in sortColumns)
-	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] if not column.startswith("-") else reversor(job[columnIdx]) for column, columnIdx in zip(sortColumns, sortColumnIdxs)))
+	sortColumnsRaw = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
+	sortColumns = tuple(column[1:] if column.startswith("-") else column for column in sortColumnsRaw)
+	sortColumnAsc = tuple(not column.startswith("-") for column in sortColumnsRaw)
+	assert all(column.upper() in columns for column in sortColumns)
+	sortColumnIdxs = tuple(columns.index(column.upper()) for column in sortColumns)
+	if not "'${dates}'":
+		sortColumnAsc = tuple(not columnAsc if 4 <= columnIdx <= 6 else columnAsc for columnAsc, columnIdx in zip(sortColumnAsc, sortColumnIdxs))
+	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] if columnAsc else reversor(job[columnIdx]) for column, columnAsc, columnIdx in zip(sortColumns, sortColumnAsc, sortColumnIdxs)))
 
 	# Print
 	print("\t".join(columns))
 	for job in jobs:
-		job[4] = time_ago(job[4])
-		job[5] = time_ago(job[5])
-		job[6] = (coloured_time_ago if not "'${nocolours}'" else time_ago)(job[6])
+		job[4] = render_date(job[4])
+		job[5] = render_date(job[5])
+		job[6] = render_date(job[6], coloured = not "'${nocolours}'")
 		print("\t".join(job))
 ' | "${column[@]}"
