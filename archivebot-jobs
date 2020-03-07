@@ -1,5 +1,12 @@
 #!/bin/bash
-columns=("JOBID" "URL" "USER" "PIPENICK" "QUEUED" "STARTED" "LAST ACTIVE") # Duplicated in Python code!
+declare -a columns columndefs columnattributes
+columns+=('jobid'); columndefs+=('job["job_data"]["ident"]'); columnattributes+=('');
+columns+=('url'); columndefs+=('job["job_data"]["url"]'); columnattributes+=('');
+columns+=('user'); columndefs+=('job["job_data"]["started_by"]'); columnattributes+=('');
+columns+=('pipenick'); columndefs+=('pipelines[job["job_data"]["pipeline_id"]] if job["job_data"]["pipeline_id"] in pipelines else "unknown"'); columnattributes+=('');
+columns+=('queued'); columndefs+=('job["job_data"]["queued_at"]'); columnattributes+=('date');
+columns+=('started'); columndefs+=('job["job_data"]["started_at"]'); columnattributes+=('date');
+columns+=('last active'); columndefs+=('int(job["ts"])'); columnattributes+=('date,coloured');
 
 function valid_column {
 	local candidate="$1"
@@ -79,7 +86,7 @@ then
 		exit 1
 	fi
 	column="${filter%%[=<>^*$~]*}"
-	if ! valid_column "${column^^}"
+	if ! valid_column "${column,,}"
 	then
 		echo "Invalid filter column: ${column}" >&2
 		exit 1
@@ -90,7 +97,7 @@ then
 	for column in "${sortcolumns[@]}"
 	do
 		column="${column#-}"
-		if ! valid_column "${column^^}"
+		if ! valid_column "${column,,}"
 		then
 			echo "Invalid sort column: ${column}" >&2
 			exit 1
@@ -98,7 +105,7 @@ then
 	done
 else
 	# Default sort order
-	sortcolumns+=("JOBID")
+	sortcolumns+=("jobid")
 fi
 
 if [[ "${notable}" ]]
@@ -148,27 +155,22 @@ if True: # For sensible indentation
 
 	pipelines = {p["id"]: p["nickname"] for p in pipelinedata["pipelines"]}
 
-	columns = ("JOBID", "URL", "USER", "PIPENICK", "QUEUED", "STARTED", "LAST ACTIVE") # Duplicated in Bash code!
 	jobs = []
-	for j in jobdata:
-		jobs.append([
-			j["job_data"]["ident"],
-			j["job_data"]["url"],
-			j["job_data"]["started_by"],
-			pipelines[j["job_data"]["pipeline_id"]] if j["job_data"]["pipeline_id"] in pipelines else "unknown",
-			j["job_data"]["queued_at"],
-			j["job_data"]["started_at"],
-			int(j["ts"]),
-		])
+	for job in jobdata:
+		jobs.append({'"$(for i in ${!columns[@]}; do echo '
+			"'"${columns[$i]}"'": '"${columndefs[$i]}"','; done)"'
+		})
+
+	columns = ('"$(for column in "${columns[@]}"; do echo '"'"${column}"'", '; done)"')
+	columnAttributes = {'"$(for i in ${!columns[@]}; do echo -n '"'"${columns[$i]}"'": "'"${columnattributes[$i]}"'".split(","), '; done)"'}
 
 	# Filter
 	if filter:
 		import re
 		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^*$~])(?P<value>.*)$", filter)
 		filterDict = match.groupdict()
-		filterDict["column"] = filterDict["column"].upper()
+		filterDict["column"] = filterDict["column"].lower()
 		assert filterDict["column"] in columns
-		columnIdx = columns.index(filterDict["column"])
 		compFunc = {
 			"=": lambda a, b: a == b,
 			"<": lambda a, b: a < b,
@@ -178,10 +180,10 @@ if True: # For sensible indentation
 			"$": lambda a, b: a.endswith(b),
 			"~": lambda a, b: re.search(b, a) is not None,
 		}[filterDict["op"]]
-		if isinstance(jobs[0][columnIdx], (int, float)):
+		if isinstance(jobs[0][filterDict["column"]], (int, float)):
 			filterDict["value"] = float(filterDict["value"])
 		transform = lambda x: x.lower() if "'${filtercaseinsensitive}'" and isinstance(x, str) else x
-		jobs = [job for job in jobs if compFunc(transform(job[columnIdx]), transform(filterDict["value"]))]
+		jobs = [job for job in jobs if compFunc(transform(job[filterDict["column"]]), transform(filterDict["value"]))]
 
 	if not jobs:
 		sys.exit(0)
@@ -198,19 +200,28 @@ if True: # For sensible indentation
 			return other.obj < self.obj
 
 	sortColumnsRaw = ('"$(printf "'%s', " "${sortcolumns[@]}")"')
-	sortColumns = tuple(column[1:] if column.startswith("-") else column for column in sortColumnsRaw)
+	sortColumns = tuple((column[1:] if column.startswith("-") else column).lower() for column in sortColumnsRaw)
 	sortColumnAsc = tuple(not column.startswith("-") for column in sortColumnsRaw)
-	assert all(column.upper() in columns for column in sortColumns)
-	sortColumnIdxs = tuple(columns.index(column.upper()) for column in sortColumns)
+	assert all(column in columns for column in sortColumns)
 	if not "'${dates}'":
-		sortColumnAsc = tuple(not columnAsc if 4 <= columnIdx <= 6 else columnAsc for columnAsc, columnIdx in zip(sortColumnAsc, sortColumnIdxs))
-	jobs = sorted(jobs, key = lambda job: tuple(job[columnIdx] if columnAsc else reversor(job[columnIdx]) for column, columnAsc, columnIdx in zip(sortColumns, sortColumnAsc, sortColumnIdxs)))
+		# Reverse sorting order for columns which have a date attribute since the column will have elapsed time
+		sortColumnAttrs = tuple(columnAttr for column, columnAttr in columnAttributes.items() if column in sortColumns)
+		sortColumnAsc = tuple(not columnAsc if "date" in columnAttr else columnAsc for columnAsc, column, columnAttr in zip(sortColumnAsc, sortColumns, sortColumnAttrs))
+	jobs = sorted(jobs, key = lambda job: tuple(job[column] if columnAsc else reversor(job[column]) for column, columnAsc in zip(sortColumns, sortColumnAsc)))
+
+	# Renderers
+	renderers = {}
+	for column, columnAttr in columnAttributes.items():
+		if "date" in columnAttr:
+			if "coloured" in columnAttr:
+				renderers[column] = lambda x: render_date(x, coloured = not "'${nocolours}'")
+			else:
+				renderers[column] = render_date
 
 	# Print
-	print("\t".join(columns))
+	print("\t".join(column.upper() for column in columns))
 	for job in jobs:
-		job[4] = render_date(job[4])
-		job[5] = render_date(job[5])
-		job[6] = render_date(job[6], coloured = not "'${nocolours}'")
-		print("\t".join(job))
+		for column in renderers:
+			job[column] = renderers[column](job[column])
+		print("\t".join(job[column] for column in columns))
 ' | "${column[@]}"
