@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import json
+import math
 import re
 import sys
 import time
@@ -16,6 +17,11 @@ columns = {
 	'queued': (lambda job, pipelines: job["job_data"]["queued_at"], ('date',)),
 	'started': (lambda job, pipelines: job["job_data"]["started_at"], ('date',)),
 	'last active': (lambda job, pipelines: int(job["ts"]), ('date', 'coloured')),
+	'dl urls': (lambda job, pipelines: job["job_data"]["items_downloaded"], ()),
+	'dl size': (lambda job, pipelines: job["job_data"]["bytes_downloaded"], ('size',)),
+	'queue': (lambda job, pipelines: job["job_data"]["items_queued"] - job["job_data"]["items_downloaded"], ()),
+	'con': (lambda job, pipelines: job["job_data"]["concurrency"], ()),
+	'delay': (lambda job, pipelines: str(int(job["job_data"]["delay_min"])) + '-' + str(int(job["job_data"]["delay_max"])) if job["job_data"]["delay_min"] != job["job_data"]["delay_max"] else str(int(job["job_data"]["delay_min"])), ()),
 }
 defaultSort = 'jobid'
 
@@ -146,6 +152,13 @@ def render_date(ts, coloured = False):
 	else:
 		return (colourStr, f"{diff // 86400:.0f}d {(diff % 86400) // 3600:.0f}h ago", colourEndStr)
 
+def render_size(size):
+	units = ('B', 'KiB', 'MiB', 'GiB', 'TiB')
+	unitIdx = min(int(math.log(size, 1024)), len(units) - 1) if size >= 1 else 0
+	if unitIdx == 0:
+		return f'{size} B' # No decimal places
+	return f'{size / 1024 ** unitIdx:.1f} {units[unitIdx]}'
+
 renderers = {}
 for column, (_, columnAttr) in columns.items():
 	if "date" in columnAttr:
@@ -153,6 +166,10 @@ for column, (_, columnAttr) in columns.items():
 			renderers[column] = lambda x: render_date(x, coloured = not args.no_colours)
 		else:
 			renderers[column] = render_date
+	elif "size" in columnAttr:
+		renderers[column] = render_size
+	elif isinstance(jobs[0][column], (int, float)):
+		renderers[column] = str
 
 # Print
 output = []
