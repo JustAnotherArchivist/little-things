@@ -70,6 +70,7 @@ parser.add_argument('--ifilter', '-i', nargs = 1, type = str, action = FilterAct
 parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help = "Don't colourise the last activity column if it's been a while.")
 parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs.')
 parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns.')
+parser.add_argument('--dashboard-regex', action = 'store_true', help = 'Instead of the normal output, compose a regular expression that can be used on the dashboard to actively watch the jobs matched by the filter. (--sort, --no-colours, --no-table, and --dates have no effect when this option is used.)')
 args = parser.parse_args()
 
 if not args.sort:
@@ -117,6 +118,10 @@ if args.filter:
 
 	if not jobs:
 		sys.exit(0)
+
+if args.dashboard_regex:
+	print('^(' + '|'.join(re.escape(job['url']) for job in jobs) + ')$')
+	sys.exit(0)
 
 # Sort
 class reversor: # https://stackoverflow.com/a/56842689
