@@ -58,7 +58,6 @@ class SortAction(argparse.Action):
 		getattr(namespace, self.dest).append(result)
 
 parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
-parser.add_argument('--sort', '-s', nargs = 1, type = str, action = SortAction, help = "Sort the table by a COLUMN (descending if preceded by '-'). This can be used multiple times to refine the sorting.")
 parser.add_argument('--filter', '-f', nargs = 1, type = str, action = FilterAction, help = '\n'.join([
 	'Filter the table for rows where a COLUMN has a certain VALUE. If specified multiple times, only the last value is used.',
 	'FILTER has the format COLUMN{=|<|>|^|*|$|~}VALUE',
@@ -69,10 +68,7 @@ parser.add_argument('--filter', '-f', nargs = 1, type = str, action = FilterActi
 	'  ~ means it must match the specified regex.',
   ]))
 parser.add_argument('--ifilter', '-i', nargs = 1, type = str, action = FilterAction, dest = 'filter', help = 'Like --filter but case-insensitive')
-parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help = "Don't colourise the last activity column if it's been a while. (Table mode only)")
-parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs. (Table mode only)')
-parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns. (Table mode only)')
-parser.add_argument('--format', help = 'Output format for the format mode; this must be a Python format string and can use any column name in lower-case with spaces replaced by underscores; e.g. "{url} {last_active}". (Format mode only)')
+parser.add_argument('--sort', '-s', nargs = 1, type = str, action = SortAction, help = "Sort the table by a COLUMN (descending if preceded by '-'). This can be used multiple times to refine the sorting.")
 parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-commands', 'format'), default = 'table', help = '\n'.join([
 	'Output modes:',
 	'  table: print a table of the matched jobs',
@@ -80,6 +76,10 @@ parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-comm
 	'  con-d-commands: print !con and !d commands for the current settings',
 	'  format: print some output for each job, separated by newlines; this requires the --format option',
   ]))
+parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help = "Don't colourise the last activity column if it's been a while. (Table mode only)")
+parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs. (Table mode only)')
+parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns. (Table mode only)')
+parser.add_argument('--format', help = 'Output format for the format mode; this must be a Python format string and can use any column name in lower-case with spaces replaced by underscores; e.g. "{url} {last_active}". (Format mode only)')
 args = parser.parse_args()
 
 if args.mode == 'format' and not args.format:
