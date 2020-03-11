@@ -72,13 +72,19 @@ parser.add_argument('--ifilter', '-i', nargs = 1, type = str, action = FilterAct
 parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help = "Don't colourise the last activity column if it's been a while. (Table mode only)")
 parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs. (Table mode only)')
 parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns. (Table mode only)')
-parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-commands'), default = 'table', help = '\n'.join([
+parser.add_argument('--format', help = 'Output format for the format mode; this must be a Python format string and can use any column name in lower-case with spaces replaced by underscores; e.g. "{url} {last_active}". (Format mode only)')
+parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-commands', 'format'), default = 'table', help = '\n'.join([
 	'Output modes:',
 	'  table: print a table of the matched jobs',
 	'  dashboard-regex: compose a regular expression that can be used on the dashboard to actively watch the jobs matched by the filter',
 	'  con-d-commands: print !con and !d commands for the current settings',
+	'  format: print some output for each job, separated by newlines; this requires the --format option',
   ]))
 args = parser.parse_args()
+
+if args.mode == 'format' and not args.format:
+	print('Error: when using format mode, --format is required.', file = sys.stderr)
+	sys.exit(1)
 
 if not args.sort:
 	args.sort = [parse_sort(defaultSort)]
@@ -151,6 +157,10 @@ elif args.mode == 'con-d-commands':
 	for job in jobs:
 		print(f'!con {job["jobid"]} {job["con"]}')
 		print(f'!d {job["jobid"]} {job["delay min"]} {job["delay max"]}')
+	sys.exit(0)
+elif args.mode == 'format':
+	for job in jobs:
+		print(args.format.format(**{key.replace(' ', '_'): value for key, value in job.items()}))
 	sys.exit(0)
 
 # Renderers
