@@ -1,0 +1,8 @@
+#!/bin/bash
+# Usage: wpull2-extract-remaining FILENAME
+#  FILENAME points to a wpull 2.x SQLite DB
+# Prints all remaining URLs from the DB on stdout
+for status in in_progress todo error
+do
+	sqlite3 "$1" 'SELECT url_strings.url FROM queued_urls JOIN url_strings ON url_string_id = url_strings.id WHERE status = "'$status'"'
+done
