@@ -89,6 +89,10 @@ if args.mode == 'format' and not args.format:
 if not args.sort:
 	args.sort = [parse_sort(defaultSort)]
 
+if args.mode == 'con-d-commands':
+	args.mode = 'format'
+	args.format = '!con {jobid} {con}\n!d {jobid} {delay_min} {delay_max}'
+
 # Retrieve
 def fetch(url):
 	req = urllib.request.Request(url)
@@ -152,11 +156,6 @@ jobs = sorted(jobs, key = lambda job: tuple(job[column] if not descending else r
 # Non-table output modes
 if args.mode == 'dashboard-regex':
 	print('^(' + '|'.join(re.escape(job['url']) for job in jobs) + ')$')
-	sys.exit(0)
-elif args.mode == 'con-d-commands':
-	for job in jobs:
-		print(f'!con {job["jobid"]} {job["con"]}')
-		print(f'!d {job["jobid"]} {job["delay min"]} {job["delay max"]}')
 	sys.exit(0)
 elif args.mode == 'format':
 	for job in jobs:
