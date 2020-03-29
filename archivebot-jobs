@@ -215,7 +215,15 @@ printableColumns = {column: colDef for column, colDef in columns.items() if 'hid
 if not args.no_table and not args.no_truncate:
 	widthsD = {column: max(itertools.chain((len(column),), (len(job[column]) if isinstance(job[column], str) else len(job[column][1]) for job in jobs))) for column in printableColumns}
 	minWidthsD = {column: len(column) for column in printableColumns}
-	termWidth = os.get_terminal_size().columns
+	try:
+		termWidth = os.get_terminal_size().columns
+	except OSError as e:
+		if e.errno == 25:
+			# Inappropriate ioctl for device (stdout not a terminal, happens e.g. when redirecting or piping)
+			# Silently ignore this and don't truncate
+			termWidth = float('Inf')
+		else:
+			raise
 	overage = sum(x + 2 for x in widthsD.values()) - 2 - termWidth
 	if overage > 0:
 		if sum((widthsD[column] if 'truncatable' not in colDef[1] else minWidthsD[column]) + 2 for column, colDef in printableColumns.items()) - 2 > termWidth:
