@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
+import itertools
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -11,7 +13,7 @@ import urllib.request
 # Column definitions
 columns = {
 	'jobid': (lambda job, pipelines: job["job_data"]["ident"], ()),
-	'url': (lambda job, pipelines: job["job_data"]["url"], ()),
+	'url': (lambda job, pipelines: job["job_data"]["url"], ('truncatable',)),
 	'user': (lambda job, pipelines: job["job_data"]["started_by"], ()),
 	'pipenick': (lambda job, pipelines: pipelines[job["job_data"]["pipeline_id"]] if job["job_data"]["pipeline_id"] in pipelines else "unknown", ()),
 	'queued': (lambda job, pipelines: job["job_data"]["queued_at"], ('date',)),
@@ -26,6 +28,11 @@ columns = {
 	'delay': (lambda job, pipelines: str(int(job["job_data"]["delay_min"])) + '-' + str(int(job["job_data"]["delay_max"])) if job["job_data"]["delay_min"] != job["job_data"]["delay_max"] else str(int(job["job_data"]["delay_min"])), ()),
 }
 defaultSort = 'jobid'
+
+# Validate
+if any('truncatable' in colDef[1] and any(x in colDef[1] for x in ('date', 'coloured', 'size')) for colDef in columns.values()):
+	# Truncation code can't handle renderers
+	raise RuntimeError('Invalid column definitions: cannot combine date/coloured/size with truncatable')
 
 # Parse arguments
 class FilterAction(argparse.Action):
@@ -78,6 +85,7 @@ parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-comm
   ]))
 parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help = "Don't colourise the last activity column if it's been a while. (Table mode only)")
 parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs. (Table mode only)')
+parser.add_argument('--no-truncate', action = 'store_true', help = 'Disable truncating long values if the terminal width would be exceeded. (Table mode without --no-table only)')
 parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns. (Table mode only)')
 parser.add_argument('--format', help = 'Output format for the format mode; this must be a Python format string and can use any column name in lower-case with spaces replaced by underscores; e.g. "{url} {last_active}". (Format mode only)')
 args = parser.parse_args()
@@ -198,12 +206,38 @@ for column, (_, columnAttr) in columns.items():
 	elif isinstance(jobs[0][column], (int, float)):
 		renderers[column] = str
 
+for job in jobs:
+	for column in renderers:
+		job[column] = renderers[column](job[column])
+
+# Truncate if applicable
+printableColumns = {column: colDef for column, colDef in columns.items() if 'hidden' not in colDef[1]}
+if not args.no_table and not args.no_truncate:
+	widthsD = {column: max(itertools.chain((len(column),), (len(job[column]) if isinstance(job[column], str) else len(job[column][1]) for job in jobs))) for column in printableColumns}
+	minWidthsD = {column: len(column) for column in printableColumns}
+	termWidth = os.get_terminal_size().columns
+	overage = sum(x + 2 for x in widthsD.values()) - 2 - termWidth
+	if overage > 0:
+		if sum((widthsD[column] if 'truncatable' not in colDef[1] else minWidthsD[column]) + 2 for column, colDef in printableColumns.items()) - 2 > termWidth:
+			# Even truncating all truncatable columns to the minimum width is not sufficient, i.e. can't match this terminal width. Print a warning and proceed normally
+			print('Sorry, cannot truncate columns to terminal width', file = sys.stderr)
+		else:
+			# Distribute overage to truncatable columns proportionally to each column's length over the minimum
+			truncatableColumns = {column: colDef for column, colDef in columns.items() if 'truncatable' in colDef[1]}
+			totalOverMin = sum(widthsD[column] - minWidthsD[column] for column in truncatableColumns)
+			trWidthsD = {column: math.floor(widthsD[column] - (widthsD[column] - minWidthsD[column]) / totalOverMin * overage) for column in truncatableColumns}
+			if sum(widthsD[column] - trWidthsD[column] for column in truncatableColumns) - overage == 1:
+				# Truncated one more character than necessary due to the flooring; add it again to the shortest column
+				trWidthsD[min(trWidthsD, key = trWidthsD.get)] += 1
+			for job in jobs:
+				for column in truncatableColumns:
+					if len(job[column]) > trWidthsD[column]:
+						job[column] = job[column][:trWidthsD[column] - 1] + '…'
+
 # Print
 output = []
 output.append(tuple(column.upper() for column in columns if "hidden" not in columns[column][1]))
 for job in jobs:
-	for column in renderers:
-		job[column] = renderers[column](job[column])
 	output.append(tuple(job[column] for column in columns if "hidden" not in columns[column][1]))
 
 if not args.no_table:
