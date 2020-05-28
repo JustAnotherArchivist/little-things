@@ -67,16 +67,16 @@ class WARCBlockChunk(_DataChunk):
 		return self._isHttpHeader
 
 
-class RawHTTPResponseBodyChunk(_DataChunk):
+class RawHTTPBodyChunk(_DataChunk):
 	'''
 	Because many tools misunderstood the WARC specifications, the Payload-Digest was often implemented without stripping transfer encoding.
-	This is like HTTPResponseBodyChunk but without transfer encoding stripping.
+	This is like HTTPBodyChunk but without transfer encoding stripping.
 	'''
 
 
-class HTTPResponseBodyChunk(_DataChunk):
+class HTTPBodyChunk(_DataChunk):
 	'''
-	Representing a part of the HTTP response body with transfer encoding stripped.
+	Representing a part of the HTTP body with transfer encoding stripped.
 	'''
 
 
@@ -123,7 +123,7 @@ def iter_warc(f):
 			warcContent = buf[:warcContentLength]
 			buf = buf[warcContentLength + 4:]
 
-			# Decode HTTP response if it is one
+			# Decode HTTP body if appropriate
 			if warcContentType in (b'application/http;msgtype=request', b'application/http; msgtype=request') and warcType == b'request':
 				httpType = 'request'
 			elif warcContentType in (b'application/http;msgtype=response', b'application/http; msgtype=response') and warcType == b'response':
@@ -146,39 +146,38 @@ def iter_warc(f):
 
 					yield WARCBlockChunk(httpHeaders + b'\r\n\r\n', isHttpHeader = True)
 					yield WARCBlockChunk(httpBody, isHttpHeader = False)
-					yield RawHTTPResponseBodyChunk(httpBody)
+					yield RawHTTPBodyChunk(httpBody)
 
-					if httpType == 'response':
-						# Decode body
-						if gzipped:
-							httpDecompressor = GzipDecompressor()
-						else:
-							httpDecompressor = DummyDecompressor()
-						if chunked:
-							while True:
-								try:
-									chunkLineEnd = httpBody.index(b'\r\n')
-								except ValueError:
-									print('Error: could not find chunk line end in record {}, skipping'.format(recordID), file = sys.stderr)
-									break
-								chunkLine = httpBody[:chunkLineEnd]
-								if b';' in chunkLine:
-									chunkLength = chunkLine[:chunkLine.index(b';')].strip()
-								else:
-									chunkLength = chunkLine.strip()
-								if chunkLength.lstrip(b'0123456789abcdefABCDEF') != b'':
-									print('Error: malformed chunk length {!r} in record {}, skipping'.format(chunkLength, recordID), file = sys.stderr)
-									break
-								chunkLength = int(chunkLength, base = 16)
-								if chunkLength == 0:
-									break
-								chunk = httpDecompressor.decompress(httpBody[chunkLineEnd + 2 : chunkLineEnd + 2 + chunkLength])
-								yield HTTPResponseBodyChunk(chunk)
-								httpBody = httpBody[chunkLineEnd + 2 + chunkLength + 2:]
-						else:
-							yield HTTPResponseBodyChunk(httpDecompressor.decompress(httpBody))
+					# Decode body
+					if gzipped:
+						httpDecompressor = GzipDecompressor()
+					else:
+						httpDecompressor = DummyDecompressor()
+					if chunked:
+						while True:
+							try:
+								chunkLineEnd = httpBody.index(b'\r\n')
+							except ValueError:
+								print('Error: could not find chunk line end in record {}, skipping'.format(recordID), file = sys.stderr)
+								break
+							chunkLine = httpBody[:chunkLineEnd]
+							if b';' in chunkLine:
+								chunkLength = chunkLine[:chunkLine.index(b';')].strip()
+							else:
+								chunkLength = chunkLine.strip()
+							if chunkLength.lstrip(b'0123456789abcdefABCDEF') != b'':
+								print('Error: malformed chunk length {!r} in record {}, skipping'.format(chunkLength, recordID), file = sys.stderr)
+								break
+							chunkLength = int(chunkLength, base = 16)
+							if chunkLength == 0:
+								break
+							chunk = httpDecompressor.decompress(httpBody[chunkLineEnd + 2 : chunkLineEnd + 2 + chunkLength])
+							yield HTTPBodyChunk(chunk)
+							httpBody = httpBody[chunkLineEnd + 2 + chunkLength + 2:]
+					else:
+						yield HTTPBodyChunk(httpDecompressor.decompress(httpBody))
 				else:
-					print('Warning: malformed HTTP response in record {}, skipping'.format(recordID), file = sys.stderr)
+					print('Warning: malformed HTTP request or response in record {}, skipping'.format(recordID), file = sys.stderr)
 					yield WARCBlockChunk(warcContent)
 			else:
 				yield WARCBlockChunk(warcContent)
@@ -253,10 +252,10 @@ class VerifyMode(ProcessMode):
 		elif type(event) is WARCBlockChunk:
 			if self._blockDigester:
 				self._blockDigester.update(event.data)
-		elif type(event) is HTTPResponseBodyChunk:
+		elif type(event) is HTTPBodyChunk:
 			if self._payloadDigester:
 				self._payloadDigester.update(event.data)
-		elif type(event) is RawHTTPResponseBodyChunk:
+		elif type(event) is RawHTTPBodyChunk:
 			if self._brokenPayloadDigester:
 				self._brokenPayloadDigester.update(event.data)
 		elif type(event) is EndOfRecord:
@@ -276,13 +275,18 @@ class VerifyMode(ProcessMode):
 class DumpResponsesMode(ProcessMode):
 	def __init__(self):
 		self._printEOR = False
+		self._isResponse = False
 
 	def process_event(self, event):
 		if type(event) is BeginOfRecord:
+			warcContentType = next(x[1] for x in event.warcHeaders if x[0] == b'Content-Type')
+			warcType = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Type')
+			self._isResponse = warcContentType in (b'application/http;msgtype=response', b'application/http; msgtype=response') and warcType == b'response'
 			self._printEOR = False
-		elif type(event) is HTTPResponseBodyChunk:
-			self._printEOR = True
-			sys.stdout.buffer.write(event.data)
+		elif type(event) is HTTPBodyChunk:
+			if self._isResponse:
+				self._printEOR = True
+				sys.stdout.buffer.write(event.data)
 		elif type(event) is EndOfRecord:
 			if self._printEOR:
 				sys.stdout.buffer.write(b'\r\n')
