@@ -40,7 +40,7 @@ class FilterAction(argparse.Action):
 		global columns
 		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^*$~])(?P<value>.*)$", values[0])
 		if not match:
-			raise argparse.ArgumentError('Invalid filter')
+			parser.error('Invalid filter')
 		filterDict = match.groupdict()
 		filterDict["column"] = filterDict["column"].lower()
 		assert filterDict["column"] in columns
@@ -54,7 +54,7 @@ def parse_sort(value):
 		value = value[1:]
 	value = value.lower()
 	if value not in columns:
-		raise argparse.ArgumentError('Invalid column name')
+		parser.error('Invalid column name')
 	return (value, sortDesc)
 
 class SortAction(argparse.Action):
