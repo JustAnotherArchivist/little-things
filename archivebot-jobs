@@ -16,15 +16,15 @@ columns = {
 	'url': (lambda job, pipelines: job["job_data"]["url"], ('truncatable',)),
 	'user': (lambda job, pipelines: job["job_data"]["started_by"], ()),
 	'pipenick': (lambda job, pipelines: pipelines[job["job_data"]["pipeline_id"]] if job["job_data"]["pipeline_id"] in pipelines else "unknown", ()),
-	'queued': (lambda job, pipelines: job["job_data"]["queued_at"], ('date',)),
-	'started': (lambda job, pipelines: job["job_data"]["started_at"], ('date',)),
-	'last active': (lambda job, pipelines: int(job["ts"]), ('date', 'coloured')),
-	'dl urls': (lambda job, pipelines: job["job_data"]["items_downloaded"], ()),
-	'dl size': (lambda job, pipelines: job["job_data"]["bytes_downloaded"], ('size',)),
-	'queue': (lambda job, pipelines: job["job_data"]["items_queued"] - job["job_data"]["items_downloaded"], ()),
-	'con': (lambda job, pipelines: job["job_data"]["concurrency"], ()),
-	'delay min': (lambda job, pipelines: int(job["job_data"]["delay_min"]), ('hidden',)),
-	'delay max': (lambda job, pipelines: int(job["job_data"]["delay_max"]), ('hidden',)),
+	'queued': (lambda job, pipelines: job["job_data"]["queued_at"], ('date', 'numeric')),
+	'started': (lambda job, pipelines: job["job_data"]["started_at"], ('date', 'numeric')),
+	'last active': (lambda job, pipelines: int(job["ts"]), ('date', 'coloured', 'numeric')),
+	'dl urls': (lambda job, pipelines: job["job_data"]["items_downloaded"], ('numeric',)),
+	'dl size': (lambda job, pipelines: job["job_data"]["bytes_downloaded"], ('size', 'numeric')),
+	'queue': (lambda job, pipelines: job["job_data"]["items_queued"] - job["job_data"]["items_downloaded"], ('numeric',)),
+	'con': (lambda job, pipelines: job["job_data"]["concurrency"], ('numeric',)),
+	'delay min': (lambda job, pipelines: int(job["job_data"]["delay_min"]), ('hidden', 'numeric')),
+	'delay max': (lambda job, pipelines: int(job["job_data"]["delay_max"]), ('hidden', 'numeric')),
 	'delay': (lambda job, pipelines: str(int(job["job_data"]["delay_min"])) + '-' + str(int(job["job_data"]["delay_max"])) if job["job_data"]["delay_min"] != job["job_data"]["delay_max"] else str(int(job["job_data"]["delay_min"])), ()),
 }
 defaultSort = 'jobid'
@@ -34,9 +34,34 @@ if any('truncatable' in colDef[1] and any(x in colDef[1] for x in ('date', 'colo
 	# Truncation code can't handle renderers
 	raise RuntimeError('Invalid column definitions: cannot combine date/coloured/size with truncatable')
 
+# Filter function
+def make_field_filter(column, op, value, caseSensitive = True):
+	compFunc = {
+		"=": lambda a, b: a == b,
+		"<": lambda a, b: a < b,
+		">": lambda a, b: a > b,
+		"^": lambda a, b: a.startswith(b),
+		"*": lambda a, b: b in a,
+		"$": lambda a, b: a.endswith(b),
+		"~": lambda a, b: re.search(b, a) is not None,
+	}[op]
+	transform = {
+		True: (lambda x: x),
+		False: (lambda x: x.lower() if isinstance(x, str) else x)
+	}[caseSensitive]
+	return (lambda job: compFunc(transform(job[column]), transform(value)))
+
+
 # Parse arguments
 class FilterAction(argparse.Action):
 	def __call__(self, parser, namespace, values, optionString = None):
+		if optionString == '--pyfilter':
+			try:
+				func = compile(values[0], '<pyfilter>', 'eval')
+			except Exception as e:
+				parser.error(f'Could not compile filter expression: {type(e).__module__}.{type(e).__name__}: {e!s}')
+			setattr(namespace, self.dest, lambda job: eval(func, {}, {'job': job}))
+			return
 		global columns
 		match = re.match(r"^(?P<column>[A-Za-z ]+)(?P<op>[=<>^*$~])(?P<value>.*)$", values[0])
 		if not match:
@@ -44,8 +69,9 @@ class FilterAction(argparse.Action):
 		filterDict = match.groupdict()
 		filterDict["column"] = filterDict["column"].lower()
 		assert filterDict["column"] in columns
-		transform = (lambda x: x.lower() if isinstance(x, str) else x) if optionString in ('--ifilter', '-i') else (lambda x: x)
-		setattr(namespace, self.dest, (filterDict, transform))
+		if 'numeric' in columns[filterDict['column']][1]:
+			filterDict['value'] = float(filterDict['value'])
+		setattr(namespace, self.dest, make_field_filter(filterDict['column'], filterDict['op'], filterDict['value'], caseSensitive = (optionString in ('--filter', '-f'))))
 
 def parse_sort(value):
 	global columns
@@ -75,6 +101,7 @@ parser.add_argument('--filter', '-f', nargs = 1, type = str, action = FilterActi
 	'  ~ means it must match the specified regex.',
   ]))
 parser.add_argument('--ifilter', '-i', nargs = 1, type = str, action = FilterAction, dest = 'filter', help = 'Like --filter but case-insensitive')
+parser.add_argument('--pyfilter', nargs = 1, type = str, action = FilterAction, dest = 'filter', help = 'A Python expression for filtering using the local variable `job`')
 parser.add_argument('--sort', '-s', nargs = 1, type = str, action = SortAction, help = "Sort the table by a COLUMN (descending if preceded by '-'). This can be used multiple times to refine the sorting.")
 parser.add_argument('--mode', choices = ('table', 'dashboard-regex', 'con-d-commands', 'format'), default = 'table', help = '\n'.join([
 	'Output modes:',
@@ -132,19 +159,7 @@ if not jobs:
 
 # Filter
 if args.filter:
-	filterDict, transform = args.filter
-	compFunc = {
-		"=": lambda a, b: a == b,
-		"<": lambda a, b: a < b,
-		">": lambda a, b: a > b,
-		"^": lambda a, b: a.startswith(b),
-		"*": lambda a, b: b in a,
-		"$": lambda a, b: a.endswith(b),
-		"~": lambda a, b: re.search(b, a) is not None,
-	}[filterDict["op"]]
-	if isinstance(jobs[0][filterDict["column"]], (int, float)):
-		filterDict["value"] = float(filterDict["value"])
-	jobs = [job for job in jobs if compFunc(transform(job[filterDict["column"]]), transform(filterDict["value"]))]
+	jobs = [job for job in jobs if args.filter(job)]
 
 	if not jobs:
 		sys.exit(0)
