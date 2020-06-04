@@ -87,6 +87,8 @@ parser.add_argument('--no-colours', '--no-colors', action = 'store_true', help =
 parser.add_argument('--no-table', action = 'store_true', help = 'Raw output without feeding through column(1); columns are separated by tabs. (Table mode only)')
 parser.add_argument('--no-truncate', action = 'store_true', help = 'Disable truncating long values if the terminal width would be exceeded. (Table mode without --no-table only)')
 parser.add_argument('--dates', action = 'store_true', help = 'Print dates instead of elapsed times for queued/started/last active columns. (Table mode only)')
+parser.add_argument('--replace-concurrency', nargs = 1, metavar = 'CON', type = int, help = 'Replace the delay values with the specified ones. (con-d-commands mode only)')
+parser.add_argument('--replace-delay', nargs = 2, metavar = ('MIN', 'MAX'), type = int, help = 'Replace the delay values with the specified ones. (con-d-commands mode only)')
 parser.add_argument('--format', help = 'Output format for the format mode; this must be a Python format string and can use any column name in lower-case with spaces replaced by underscores; e.g. "{url} {last_active}". (Format mode only)')
 args = parser.parse_args()
 
@@ -100,6 +102,9 @@ if not args.sort:
 if args.mode == 'con-d-commands':
 	args.mode = 'format'
 	args.format = '!con {jobid} {con}\n!d {jobid} {delay_min} {delay_max}'
+else:
+	args.replace_concurrency = None
+	args.replace_delay = None
 
 # Retrieve
 def fetch(url):
@@ -160,6 +165,15 @@ if not args.dates:
 	# Reverse sorting order for columns which have a date attribute since the column will have elapsed time
 	sortColumns = tuple((column, not descending if 'date' in columnInfo[1] else descending, columnInfo) for column, descending, columnInfo in sortColumns)
 jobs = sorted(jobs, key = lambda job: tuple(job[column] if not descending else reversor(job[column]) for column, descending, _ in sortColumns))
+
+# Concurrency and delay overrides if specified and relevant
+if args.replace_concurrency is not None or args.replace_delay is not None:
+	for job in jobs:
+		if args.replace_concurrency is not None:
+			job['con'] = args.replace_concurrency[0]
+		if args.replace_delay is not None:
+			job['delay min'] = args.replace_delay[0]
+			job['delay max'] = args.replace_delay[1]
 
 # Non-table output modes
 if args.mode == 'dashboard-regex':
