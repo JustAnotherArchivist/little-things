@@ -133,7 +133,7 @@ do
 			fi
 			if [[ "${filename}" && ${size} -ge 0 ]]
 			then
-				debfiles["${archiveRoot}/dists/${distribution}/${filename}"]=${size}
+				debfiles["${archiveRoot}/${filename}"]=${size}
 				filename=
 				size=-1
 			fi
