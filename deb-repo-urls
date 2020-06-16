@@ -1,0 +1,165 @@
+#!/bin/bash
+set -e
+
+if [[ $# -ne 2 || "$1" == '-h' || "$1" == '--help' ]]
+then
+	echo 'Lists all relevant files in a Debian-style repository' >&2
+	echo >&2
+	echo 'Usage: deb-repo-ls ARCHIVEROOT DISTRIBUTION' >&2
+	exit 1
+fi
+
+archiveRoot="$1"
+distribution="$2"
+
+while [[ "${archiveRoot}" == */ ]]; do archiveRoot="${archiveRoot%/}"; done  # Strip trailing slashes since they're added again manually below
+if [[ "${distribution}" == */ || "${distribution}" == /* ]]; then echo "Invalid distribution" >&2; exit 1; fi
+
+declare -i fetchedSize
+declare -i totalSize=0
+
+pipe=$(mktemp -u); mkfifo "${pipe}"; exec 3<>"${pipe}"; rm "${pipe}"; unset pipe  # For fetch size
+
+function maybe_decompress {
+	url="$1"
+	if [[ "${url}" == *'.gz' ]]
+	then
+		gunzip
+	elif [[ "${url}" == *'.bz2' ]]
+	then
+		bunzip2
+	elif [[ "${url}" == *'.xz' ]]
+	then
+		unxz
+	else
+		# Peek at the data to see if it's compressed
+		beginning="$(head -c 10 | xxd -p)"
+		{
+			xxd -p -r <<<"${beginning}"
+			cat
+		} | {
+			if [[ "${beginning}" == '1f8b'* ]]
+			then
+				gunzip
+			elif [[ "${beginning}" == '425a68'??'314159265359'* ]]
+			then
+				bunzip2
+			elif [[ "${beginning}" == 'fd377a585a00'* ]]
+			then
+				unxz
+			else
+				cat
+			fi
+		}
+	fi
+}
+
+function fetch_and_print {
+	url="$1"
+	# Fetch url, print it to stdout; as side effects, the HTTP body is stored in fetchedBody and its size is added to totalSize
+	# If the url ends with .gz, it's gunzipped; if it ends in .bz2, it gets bunzip2'd. The totalSize reflects the compressed size.
+	echo "Fetching ${url}" >&2
+	fetchedBody="$(curl -A 'Debian APT-HTTP/1.3 (1.8.2)' -s "${url}" | tee >(wc -c >&3) | maybe_decompress "${url}")"
+	echo "${url}"
+	#totalSize+=$(LANG=C; LC_ALL=C; echo ${#fetchedBody})
+	totalSize+=$(head -1 <&3)
+}
+
+function head_and_print {
+	url="$1"
+	# Issue a HEAD request on url, print it to stdout, and add its content length to totalSize
+	echo "Heading ${url}" >&2
+	declare -i contentLength="$(curl -A 'Debian APT-HTTP/1.3 (1.8.2)' -s --head "${url}" | grep -i '^Content-Length: ' | awk '{print $2}' | tr -d '\r')"
+	echo "${url}"
+	totalSize+=${contentLength}
+}
+
+# Retrieve Release and accompanying files, parse it and extract the next level
+fetch_and_print "${archiveRoot}/dists/${distribution}/Release"
+inHashSection=
+declare -A files  # filename -> size
+while IFS='' read -r line
+do
+	if [[ "${line}" == 'MD5Sum:' || "${line}" == 'SHA1:' || "${line}" == 'SHA256:' || "${line}" == 'SHA512:' ]]
+	then
+		inHashSection=1
+		continue
+	fi
+	if [[ "${line}" != ' '* ]]
+	then
+		inHashSection=
+		continue
+	fi
+	if [[ "${inHashSection}" ]]
+	then
+		files["$(awk '{print $3}' <<<"${line}")"]="$(awk '{print $2}' <<<"${line}")"
+	fi
+done <<<"${fetchedBody}"
+
+head_and_print "${archiveRoot}/dists/${distribution}/Release.gpg"
+head_and_print "${archiveRoot}/dists/${distribution}/InRelease"
+
+# Process files
+filename=
+declare -i size=-1
+declare -A debfiles  # filename -> size
+for fn in "${!files[@]}"
+do
+	# Legacy releases
+	if [[ "${fn}" =~ /Release$ ]]
+	then
+		echo "${archiveRoot}/dists/${distribution}/${fn}"
+		totalSize+="${files[$fn]}"
+
+	# Package indices
+	elif [[ "${fn}" =~ /Packages(\.[^/]*)?$ ]]
+	then
+		echo "Processing package: ${fn}"
+		fetch_and_print "${archiveRoot}/dists/${distribution}/${fn}"
+		filename=
+		size=-1
+		while IFS= read -r line
+		do
+			if [[ "${line}" == '' ]]
+			then
+				filename=
+				size=-1
+			elif [[ "${line}" == 'Filename: '* ]]
+			then
+				filename="${line:10}"
+			elif [[ "${line}" == 'Size: '* ]]
+			then
+				size="${line:6}"
+			fi
+			if [[ "${filename}" && ${size} -ge 0 ]]
+			then
+				debfiles["${archiveRoot}/dists/${distribution}/${filename}"]=${size}
+				filename=
+				size=-1
+			fi
+		done <<<"${fetchedBody}"
+
+	# Contents indices
+	elif [[ "${fn}" =~ /Contents-[^/]*$ ]]
+	then
+		# Nothing really to do here but take note of its existence
+		echo "${archiveRoot}/dists/${distribution}/${fn}"
+		totalSize+="${files[$fn]}"
+
+	# Anything else
+	else
+		echo "${archiveRoot}/dists/${distribution}/${fn}"
+		totalSize+="${files[$fn]}"
+		echo "Skipping unknown file: ${fn}" >&2
+	fi
+done
+
+# Print the debfiles and add them to the total size
+for debfile in "${!debfiles[@]}"
+do
+	echo "${debfile}"
+	totalSize+="${debfiles[$debfile]}"
+done
+
+# Report total size to stderr
+echo "Total size: ${totalSize} bytes" >&2
