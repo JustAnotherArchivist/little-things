@@ -114,7 +114,7 @@ do
 	# Package indices
 	elif [[ "${fn}" =~ /Packages(\.[^/]*)?$ ]]
 	then
-		echo "Processing package: ${fn}"
+		echo "Processing package: ${fn}" >&2
 		fetch_and_print "${archiveRoot}/dists/${distribution}/${fn}"
 		filename=
 		size=-1
