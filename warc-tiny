@@ -27,7 +27,12 @@ class Event:
 
 
 class NewFile(Event):
-	pass
+	def __init__(self, filename):
+		self._filename = filename
+
+	@property
+	def filename(self):
+		return self._filename
 
 
 class BeginOfRecord(Event):
@@ -376,7 +381,7 @@ def main():
 	try:
 		for f in files:
 			print('Info: processing {}'.format(f), file = sys.stderr)
-			processor.process_event(NewFile())
+			processor.process_event(NewFile(f))
 			for event in iter_warc(f):
 					processor.process_event(event)
 	except BrokenPipeError:
