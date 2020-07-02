@@ -4,8 +4,9 @@
 # Operating modes:
 #  warc-tiny colour FILES  --  coloured output of the WARCs for easier reading
 #  warc-tiny dump-responses [-m|--meta] FILES  --  dump the HTTP response bodies to stdout
-#    With --meta, prefix every line with the filename, record offset, record ID, and target URI; e.g. 'file.warc.gz:123:<urn:uuid:41b76f1f-f946-4723-91f8-cee6491e92f3>:https://example.org/:    foobar'
+#    With --meta, prefix every line with the filename, record offset, record ID, and target URI; e.g. 'file.warc.gz:123:<urn:uuid:41b76f1f-f946-4723-91f8-cee6491e92f3>:<https://example.org/>:    foobar'
 #      The record offset may be -1 if it is not known.
+#      The filename is wrapped in angled brackets if it contains a colon; the target URI is always wrapped in angled brackets (since it virtually always contains a colon).
 #  warc-tiny verify FILES  --  verify the integrity of a WARC by comparing the digests
 
 import base64
@@ -309,13 +310,15 @@ class DumpResponsesMode(ProcessMode):
 		lines = buf.split(b'\n')
 		self._buffer = lines.pop() # Since there's an explicit `_write(b'\r\n')` at the end of the record, this implicitly resets the buffer as well
 		for line in lines:
-			sys.stdout.buffer.write(':'.join((self._filename, '-1', self._recordID, self._targetURI, '')).encode('utf-8'))
+			sys.stdout.buffer.write(':'.join((self._filename, '-1', self._recordID, '<' + self._targetURI + '>', '')).encode('utf-8'))
 			sys.stdout.buffer.write(line)
 			sys.stdout.buffer.write(b'\n')
 
 	def process_event(self, event):
 		if type(event) is NewFile:
 			self._filename = event.filename
+			if ':' in self._filename:
+				self._filename = '<' + self._filename + '>'
 		elif type(event) is BeginOfRecord:
 			warcContentType = next(x[1] for x in event.warcHeaders if x[0] == b'Content-Type')
 			warcType = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Type')
