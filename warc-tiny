@@ -185,6 +185,11 @@ def iter_warc(f):
 
 
 class ProcessMode:
+	@classmethod
+	def split_args(cls, args):
+		'''Split args into arguments to be passed into __init__ and filenames'''
+		return (), args
+
 	def process_event(self, event):
 		raise NotImplementedError
 
@@ -363,10 +368,10 @@ def main():
 	assert len(sys.argv) - 1 >= 2
 	mode = sys.argv[1]
 	assert mode in processorMap
-	files = sys.argv[2:]
+	processorArgs, files = processorMap[mode].split_args(sys.argv[2:])
 	assert files
 
-	processor = processorMap[mode]()
+	processor = processorMap[mode](*processorArgs)
 
 	try:
 		for f in files:
