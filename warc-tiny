@@ -3,7 +3,9 @@
 # Tiny tool for WARC stuff.
 # Operating modes:
 #  warc-tiny colour FILES  --  coloured output of the WARCs for easier reading
-#  warc-tiny dump-responses FILES  --  dump the HTTP response bodies to stdout
+#  warc-tiny dump-responses [-m|--meta] FILES  --  dump the HTTP response bodies to stdout
+#    With --meta, prefix every line with the filename, record offset, record ID, and target URI; e.g. 'file.warc.gz:123:<urn:uuid:41b76f1f-f946-4723-91f8-cee6491e92f3>:https://example.org/:    foobar'
+#      The record offset may be -1 if it is not known.
 #  warc-tiny verify FILES  --  verify the integrity of a WARC by comparing the digests
 
 import base64
@@ -283,23 +285,54 @@ class VerifyMode(ProcessMode):
 
 
 class DumpResponsesMode(ProcessMode):
-	def __init__(self):
+	@classmethod
+	def split_args(cls, args):
+		if args[0] == '-m' or args[0] == '--meta':
+			return (True,), args[1:]
+		return (False,), args
+
+	def __init__(self, withMeta):
 		self._printEOR = False
 		self._isResponse = False
+		self._withMeta = withMeta
+		if withMeta:
+			self._recordID = None
+			self._targetURI = None
+			self._buffer = b''
+
+	def _write(self, data):
+		if not self._withMeta:
+			sys.stdout.buffer.write(data)
+			return
+
+		buf = self._buffer + data
+		lines = buf.split(b'\n')
+		self._buffer = lines.pop() # Since there's an explicit `_write(b'\r\n')` at the end of the record, this implicitly resets the buffer as well
+		for line in lines:
+			sys.stdout.buffer.write(':'.join((self._filename, '-1', self._recordID, self._targetURI, '')).encode('utf-8'))
+			sys.stdout.buffer.write(line)
+			sys.stdout.buffer.write(b'\n')
 
 	def process_event(self, event):
-		if type(event) is BeginOfRecord:
+		if type(event) is NewFile:
+			self._filename = event.filename
+		elif type(event) is BeginOfRecord:
 			warcContentType = next(x[1] for x in event.warcHeaders if x[0] == b'Content-Type')
 			warcType = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Type')
 			self._isResponse = warcContentType in (b'application/http;msgtype=response', b'application/http; msgtype=response') and warcType == b'response'
 			self._printEOR = False
+			if self._withMeta:
+				# Both of these are URIs, and per RFC 3986, those can only contain ASCII characters.
+				self._recordID = next(x[1] for x in event.warcHeaders if x[0] == b'WARC-Record-ID').decode('ascii')
+				self._targetURI = next((x[1] for x in event.warcHeaders if x[0] == b'WARC-Target-URI'), b'').decode('ascii')
+				self._buffer = b''
 		elif type(event) is HTTPBodyChunk:
 			if self._isResponse:
 				self._printEOR = True
-				sys.stdout.buffer.write(event.data)
+				self._write(event.data)
 		elif type(event) is EndOfRecord:
 			if self._printEOR:
-				sys.stdout.buffer.write(b'\r\n')
+				self._write(b'\r\n')
 
 
 class COLOURS:
