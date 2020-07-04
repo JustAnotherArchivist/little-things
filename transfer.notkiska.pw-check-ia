@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+
+if [[ $# -ne 1 || "$1" == '-h' || "$1" == '--help' ]]
+then
+	echo 'Usage: transfer.notkiska.pw-check-ia TKPPATH'
+	echo 'TKPPATH is the path of a file on transfer.notkiska.pw, e.g. "123F3V/twitter-#qanon"'
+	echo 'Checks that the file is archived correctly on IA by downloading both copies and comparing the SHA-1.'
+	echo 'If the TKPCHECK_CACHE_DIR environment variable is set, it is used as a cache for the CDXs to avoid redownloading them from IA on every check.'
+	exit 1
+fi
+
+if [[ "${TKPCHECK_CACHE_DIR}" ]]
+then
+	if [[ -e "${TKPCHECK_CACHE_DIR}" && ! -d "${TKPCHECK_CACHE_DIR}" ]]
+	then
+		echo "Error: ${TKPCHECK_CACHE_DIR} is not a directory." >&2
+		exit 1
+	fi
+fi
+
+file="$1"
+fileid="${file%/*}"
+filename="${file#*/}"
+
+echo "Downloading from transfer.notkiska.pw" >&2
+tkphash="$(curl "https://transfer.notkiska.pw/${file}" | sha1sum | tee /dev/fd/2)"
+
+echo "Retrieving WARC list from viewer" >&2
+mapfile -t warcs < <(curl -s "http://archive.fart.website/archivebot/viewer/api/v1/search.json?q=urls-transfer.notkiska.pw-transfer.notkiska.pw-" | python3 -c 'import json,sys; [print(x["job_id"]) for x in json.loads(sys.stdin.read())["results"]]' | sed 's,^,http://archive.fart.website/archivebot/viewer/job/,' | xargs curl -s | grep -Po 'href="\Khttps://archive.org/download/[^/"]+/[^/"]+-\d\d\d\d\d\.warc\.gz(?=")')
+
+cdxLines=()
+for warc in "${warcs[@]}"
+do
+	cdx="${warc::-3}.os.cdx.gz"
+	mapfile -t -O ${#cdxLines[@]} cdxLines < <(
+		{
+			if [[ "${TKPCHECK_CACHE_DIR}" ]]
+			then
+				cdxfn="${cdx:29}"
+				mkdir -p "${TKPCHECK_CACHE_DIR}/${cdxfn%/*}"
+				if [[ ! -e "${TKPCHECK_CACHE_DIR}/${cdxfn}" ]]
+				then
+					echo "Fetching ${cdx} into local cache" >&2
+					curl -L "${cdx}" >"${TKPCHECK_CACHE_DIR}/${cdxfn}"
+				fi
+				cat "${TKPCHECK_CACHE_DIR}/${cdxfn}"
+			else
+				echo "Fetching ${cdx}" >&2
+				curl -L "${cdx}"
+			fi
+		} | zgrep -F "/${fileid}/" 2>/dev/null | tee /dev/fd/2
+	 )
+done
+
+if [[ ${#cdxLines[@]} -ne 1 ]]
+then
+	echo "Not exactly one matching CDX line found, cannot continue" >&2
+	exit 1
+fi
+
+read -r length offset iapath < <(awk '{print $9 " " $10 " " $11}' <<<"${cdxLines[0]}")
+echo "Fetching ${offset}-$((${offset}+${length})) from IA ${iapath}" >&2
+iahash="$(curl -L --range "${offset}-$((${offset}+${length}))" "https://archive.org/download/${iapath}" | zcat 2>/dev/null | awk '/^\r$/ {empty+=1; next}  (empty >= 2)' | sha1sum | tee /dev/fd/2)"
+
+if [[ "${tkphash}" == "${iahash}" ]]
+then
+	echo OK >&2
+	exit 0
+else
+	echo "Hash mismatch!" >&2
+	exit 1
+fi
