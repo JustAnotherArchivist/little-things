@@ -71,6 +71,8 @@ class FilterAction(argparse.Action):
 		assert filterDict["column"] in columns
 		if 'numeric' in columns[filterDict['column']][1]:
 			filterDict['value'] = float(filterDict['value'])
+			if 'date' in columns[filterDict['column']][1] and filterDict['value'] < 0:
+				filterDict['value'] = time.time() + filterDict['value']
 		setattr(namespace, self.dest, make_field_filter(filterDict['column'], filterDict['op'], filterDict['value'], caseSensitive = (optionString in ('--filter', '-f'))))
 
 def parse_sort(value):
