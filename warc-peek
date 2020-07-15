@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+
+# `warc-peek.py` is a small script to help looking into gzipped WARC files without decompressing the entire file.
+# It searches a window in the file for gzip's magic bytes `1F 8B`, attempts decompression, compares the result to the expected beginning of a WARC record, and prints all valid offsets.
+# These can then be used with e.g. `tail` and `zless` to actually look at the records.
+#
+# Usage: warc-peek.py WARCFILE OFFSET LENGTH
+#  Opens `WARCFILE`, reads `LENGTH` bytes starting at `OFFSET` (zero-based), and prints valid WARC record offsets to stdout (one integer per line).
+#
+# Caveats
+# - This script only works with WARCs in which each record is compressed individually.
+#   This is what the specification recommends and what most tools should generate by default, but there definitely exist valid compressed WARCs which can't be processed in this way.
+# - When you want to use `tail -c+OFFSET WARCFILE | zless` to look at the records, keep in mind that `tail` uses one-based indices, i.e. you will have to add one to the indices returned by `warc-peek.py`.
+# - `warc-peek.py` will miss valid record offsets in the last 512 bytes of the window.
+#   This is because a certain length of the compressed data is necessary to be able to decompress it. `warc-peek.py` uses 512 bytes for this and will therefore
+#   not attempt decompression when `1F 8B` is found in the last 512 bytes of the window. You can increase `LENGTH` to compensate for this if necessary.
+
+import argparse
+import logging
+import zlib
+
+
+logger = logging.getLogger('warc-peek')
+
+
+def finditer(b, sub):
+	pos = 0
+	while True:
+		pos = b.find(sub, pos)
+		if pos < 0:
+			break
+		yield pos
+		pos += 1
+
+
+def find_offsets(warcfile, offset, length):
+	with open(warcfile, 'rb') as fp:
+		fp.seek(offset)
+		buffer = fp.read(length)
+
+	logger.debug('Buffer length: {:d}'.format(len(buffer)))
+	for pos in finditer(buffer, b'\x1f\x8b'):
+		logger.debug('Trying relative offset {:d}'.format(pos))
+		if pos > len(buffer) - 512: # 512 bytes might be a bit too much, but at least it ensures that the decompression will work.
+			break
+		try:
+			dec = zlib.decompressobj(zlib.MAX_WBITS | 32).decompress(buffer[pos:pos+512])
+		except:
+			continue
+		logger.debug('First 100 bytes of decompressed data: {!r}'.format(dec[:100]))
+		if dec.startswith(b'WARC/1.0\r\n'):
+			yield offset + pos
+
+
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--debug', action = 'store_true', help = 'Enable debug output')
+	parser.add_argument('warcfile', help = 'A .warc.gz file')
+	parser.add_argument('offset', type = int, help = 'Zero-based byte offset of the window')
+	parser.add_argument('length', type = int, help = 'Length in bytes of the window')
+	args = parser.parse_args()
+
+	if args.debug:
+		logging.basicConfig(
+			format = '{asctime}  {levelname}  {name}  {message}',
+			style = '{',
+			level = logging.DEBUG,
+		)
+	for offset in find_offsets(args.warcfile, args.offset, args.length):
+		print(offset)
