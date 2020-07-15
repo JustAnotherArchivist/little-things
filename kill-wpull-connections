@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# kill-wpull-connections is a workaround for wpull's bug of HTTPS connections getting stuck, slowing down or entirely stopping progress (https://github.com/ArchiveTeam/wpull/issues/407).
+# It works by attaching to the process and shutting down the TCP connections directly using the `shutdown` syscall. Although written for use with wpull, it can actually be used for any process.
+#
+# Usage:
+# - To kill all TCP connections except those to 127.0.0.1 of a process: `kill-wpull-connections -p $PID`
+# - As a convenience option for ArchiveBot pipeline maintainers, to kill the connections of a running ArchiveBot job: `kill-wpull-connections -j $JOBID`
+# - If you get an error of `gdb.error: 'shutdown' has unknown return type; cast the call to its declared return type` then add the `-c` option *before* `-p` or `-j`, e.g. `kill-wpull-connections -c -p $PID`.
+# - If you're running wpull inside a Docker container without ptrace capabilities, you need to run kill-wpull-connections outside of the container (where you do have ptrace cap) but inside the container's network namespace.
+#  One way to do this is: `nsenter --net=$(docker inspect $CONTAINERID | jq -r .[].NetworkSettings.SandboxKey) kill-wpull-connections -p $PID`
+
+function usage_exit {
+	# usage E -- print usage; exit with status code E
+	echo 'Usage: kill-wpull-connections (-h | [-c] (-p PID | -j JOBID))'
+	echo
+	echo ' -h: Display this message and exit'
+	echo ' -c: Cast return value of shutdown(2) to int explicitly (only necessary on broken machines)'
+	echo ' -p PID: Kill connections of wpull process PID'
+	echo ' -j JOBID: Kill connections of the wpull process for ArchiveBot job JOBID'
+	exit $1
+}
+
+if [[ $# -eq 0 || $# -gt 3 ]]; then usage_exit 1; fi
+if [[ $# -eq 1 && "$1" == '-h' ]]; then usage_exit 0; fi
+if [[ $# -ne 2 && $# -ne 3 ]]; then usage_exit 1; fi
+
+cast=
+if [[ "$1" == '-c' ]]; then cast='(int)'; shift; fi
+
+if [[ "$1" != -[pj] ]]; then usage_exit 1; fi
+if [[ $# -ne 2 ]]; then usage_exit 1; fi
+
+if [[ "$1" == '-p' ]]
+then
+	wpullPid=$2
+	if [[ "${wpullPid}" == *[^0-9]* ]]
+	then
+		echo "Error: '${wpullPid}' is not a valid PID"
+		exit 1
+	fi
+elif [[ "$1" == '-j' ]]
+then
+	pids=($(pgrep --full "wpull.*/$2/"))
+	if [[ ${#pids[@]} -ne 1 ]]
+	then
+		echo "Error: not exactly one process found for '$2'"
+		exit 1
+	fi
+	wpullPid=${pids[0]}
+fi
+
+if ! command -v lsof >/dev/null 2>&1
+then
+	echo "Error: could not find lsof"
+	exit 1
+fi
+
+if ! command -v gdb >/dev/null 2>&1
+then
+	echo "Error: could not find gdb"
+	exit 1
+fi
+
+if ! ps -p ${wpullPid} >/dev/null 2>&1
+then
+	echo "Error: no process with PID ${wpullPid}"
+	exit 1
+fi
+
+if [[ -e /proc/sys/kernel/yama/ptrace_scope && "$(< /proc/sys/kernel/yama/ptrace_scope)" != "0" && $EUID -ne 0 ]]
+then
+	echo "Warning: /proc/sys/kernel/yama/ptrace_scope is not zero. You likely need to run this script as root."
+fi
+
+gdb -batch -batch-silent \
+	-ex "attach ${wpullPid}" \
+	-ex 'python import subprocess' \
+	-ex 'python def call(s): return subprocess.call(s, shell = True) == 0' \
+	-ex 'python call("echo '\''FDs before forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1") and ([gdb.execute("p '${cast}'shutdown(" + fd + ", 2)") for fd in subprocess.check_output("lsof -an -p '${wpullPid}' -i TCP -F pfn | awk '\''NR%2==0{fd=substr($0,2)}NR%2==1&&NR>1&&!/127\.0\.0\.1/{print fd}'\''", shell = True).decode("ascii").strip().split("\n")] or True) and call("echo '\''FDs after forced shutdown:'\''") and call("lsof -an -p '${wpullPid}' -i TCP | grep -v 127\.0\.0\.1")' \
+	-ex detach \
+	-ex quit
