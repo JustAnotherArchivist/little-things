@@ -27,7 +27,7 @@ echo "Downloading from transfer.notkiska.pw" >&2
 tkphash="$(curl "https://transfer.notkiska.pw/${file}" | sha1sum | tee /dev/fd/2)"
 
 echo "Retrieving WARC list from viewer" >&2
-mapfile -t warcs < <(curl -s "http://archive.fart.website/archivebot/viewer/api/v1/search.json?q=urls-transfer.notkiska.pw-transfer.notkiska.pw-" | python3 -c 'import json,sys; [print(x["job_id"]) for x in json.loads(sys.stdin.read())["results"]]' | sed 's,^,http://archive.fart.website/archivebot/viewer/job/,' | xargs curl -s | grep -Po 'href="\Khttps://archive.org/download/[^/"]+/[^/"]+-\d\d\d\d\d\.warc\.gz(?=")')
+mapfile -t warcs < <(curl -s "https://archive.fart.website/archivebot/viewer/api/v1/search.json?q=urls-transfer.notkiska.pw-transfer.notkiska.pw-" | python3 -c 'import json,sys; [print(x["job_id"]) for x in json.loads(sys.stdin.read())["results"]]' | sed 's,^,https://archive.fart.website/archivebot/viewer/job/,' | xargs curl -s | grep -Po 'href="\Khttps://archive.org/download/[^/"]+/[^/"]+-\d\d\d\d\d\.warc\.gz(?=")')
 
 cdxLines=()
 for warc in "${warcs[@]}"
