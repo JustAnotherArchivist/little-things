@@ -48,7 +48,7 @@ def find_offsets(warcfile, offset, length):
 		except:
 			continue
 		logger.debug('First 100 bytes of decompressed data: {!r}'.format(dec[:100]))
-		if dec.startswith(b'WARC/1.0\r\n'):
+		if dec.startswith(b'WARC/1.0\r\n') or dec.startswith(b'WARC/1.1\r\n'):
 			yield offset + pos
 
 
