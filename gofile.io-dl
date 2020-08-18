@@ -17,7 +17,7 @@ else
 fi
 
 server="$(curl -s "https://apiv2.gofile.io/getServer?c=${code}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read().strip())["data"]["server"])')"
-if [[ "${server}" != srv-file?? ]]
+if [[ ! "${server}" =~ ^srv-file[0-9]+$ ]]
 then
 	echo "Unexpected server value: ${server}" >&2
 	exit 1
