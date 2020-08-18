@@ -23,31 +23,33 @@ then
 	exit 1
 fi
 
-read -d '' -r size md5 name link < <(curl -s "https://${server}.gofile.io/getUpload?c=${code}" | python3 -c 'import json,sys; obj = json.loads(sys.stdin.read().strip())'$'\n''for f in obj["data"]["files"].values():'$'\n'' print(f["size"], f["md5"], f["name"], f["link"])')
+curl -s "https://${server}.gofile.io/getUpload?c=${code}" | python3 -c 'import json,sys; obj = json.loads(sys.stdin.read().strip())'$'\n''for f in obj["data"]["files"].values():'$'\n'' print(f["size"], f["md5"], f["name"], f["link"])' | \
+  while read -r size md5 name link
+  do
+	if [[ "${name}" == *'/'* || "${link}" == *' '* || "${link}" != "https://${server}.gofile.io/download/"* ]]
+	then
+		echo 'Cannot download file:' >&2
+		echo "name: ${name}" >&2
+		echo "link: ${link}" >&2
+		echo "size: ${size}" >&2
+		echo "md5: ${md5}" >&2
+		exit 1
+	fi
 
-if [[ "${name}" == *'/'* || "${link}" == *' '* || "${link}" != "https://${server}.gofile.io/download/"* ]]
-then
-	echo 'Cannot download file:' >&2
-	echo "name: ${name}" >&2
-	echo "link: ${link}" >&2
-	echo "size: ${size}" >&2
-	echo "md5: ${md5}" >&2
-	exit 1
-fi
+	if [[ -e "./${name}" ]]
+	then
+		echo "./${name} already exists" >&2
+		exit 1
+	fi
 
-if [[ -e "./${name}" ]]
-then
-	echo "./${name} already exists" >&2
-	exit 1
-fi
+	curl "${link}" >"./${name}"
 
-curl "${link}" >"./${name}"
+	declare -i actualSize=$(stat -c %s "./${name}")
+	if [[ ${actualSize} -ne ${size} ]]
+	then
+		echo "Size mismatch: expected ${size}, got ${actualSize}" >&2
+		exit 1
+	fi
 
-declare -i actualSize=$(stat -c %s "./${name}")
-if [[ ${actualSize} -ne ${size} ]]
-then
-	echo "Size mismatch: expected ${size}, got ${actualSize}" >&2
-	exit 1
-fi
-
-md5sum -c <<<"${md5}  ./${name}"
+	md5sum -c <<<"${md5}  ./${name}"
+  done
