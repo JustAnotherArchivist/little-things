@@ -42,6 +42,7 @@ curl -s "https://${server}.gofile.io/getUpload?c=${code}" | python3 -c 'import j
 		exit 1
 	fi
 
+	echo "Downloading ${link} to ./${name}..." >&2
 	curl "${link}" >"./${name}"
 
 	declare -i actualSize=$(stat -c %s "./${name}")
