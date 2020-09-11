@@ -1,0 +1,59 @@
+#!/bin/bash
+
+if [[ "$1" == '--test' ]]
+then
+	## Self-test
+
+	# Notes:
+	# - Only the response lines are included here; the requests would be skipped anyway.
+	# - I didn't bother adjusting the status code message since it's not used for parsing
+	# - Only one example of an ERROR is included because the error message doesn't matter anyway
+
+	diff -q <("$0" <<-EOF
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/success-200’: 200 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/success-204’: 204 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/success-304’: 304 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/ok-401’: 401 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/ok-403’: 403 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/ok-404’: 404 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/ok-405’: 405 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/ok-410’: 410 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429’: 429 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-418’: 418 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.base - ERROR - Fetching ‘https://example.org/error-dns’ encountered an error: DNS resolution failed: [Errno -2] Name or service not known
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429-successful-retry’: 429 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429-successful-retry’: 200 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429-successful-second-retry’: 429 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429-successful-second-retry’: 429 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-429-successful-second-retry’: 200 OK. Length: 1234 [text/html; charset=utf-8].
+			2020-09-10 23:54:25,000 - wpull.processor.base - ERROR - Fetching ‘https://example.org/error-dns-successful-retry’ encountered an error: DNS resolution failed: [Errno -2] Name or service not known
+			2020-09-10 23:54:25,000 - wpull.processor.web - INFO - Fetched ‘https://example.org/error-dns-successful-retry’: 200 OK. Length: 1234 [text/html; charset=utf-8].
+		EOF
+	  ) <(cat <<-EOF
+			https://example.org/error-429
+			https://example.org/error-418
+			https://example.org/error-dns
+		EOF
+	  ) >/dev/null
+	if [[ $? -eq 0 ]]
+	then
+		echo 'Success!'
+		exit 0
+	else
+		echo 'Fail!'
+		exit 1
+	fi
+fi
+
+if [[ -t 0 || "$1" == '--help' ]]
+then
+	echo 'Usage: pipe a wpull log (or meta WARC, decompressed) to this script' >&2
+	echo 'Produces a list of URLs that were attempted but not retrieved successfully. They are output in the order of the first failure.' >&2
+	exit 1
+fi
+
+# Logic: extract all lines of interest, process them such that they only contain a + or - indicating success or error plus the URL, filter the errors with the successes in awk.
+# The output order is as each URL appears for the first time in the log. Since awk doesn't preserve the insertion order on iteration, keep the line number and sort the output on that.
+grep -F -e ' - ERROR - Fetching ‘' -e ' - INFO - Fetched ‘' | sed 's,^.*‘\(.*\)’: \(200\|204\|304\|401\|403\|404\|405\|410\) .*$,+ \1,; s,^.*‘\(.*\)’.*$,- \1,' | awk '/^\+ / { successes[$2] = 1; }  /^- / && ! ($2 in successes) { errors[$2] = NR; }  END { for (url in errors) { if (! (url in successes)) { print errors[url] " " url; } } }' | sort -n | cut -d' ' -f2-
+
+# Faster version without preserving order: grep -F -e ' - ERROR - Fetching ‘' -e ' - INFO - Fetched ‘' | sed 's,^.*‘\(.*\)’: \(200\|204\|304\|401\|403\|404\|405\|410\) .*$,+ \1,; s,^.*‘\(.*\)’.*$,- \1,' | awk '/^\+ / { successes[$2] = 1; }  /^- / && ! ($2 in successes) { errors[$2] = 1; }  END { for (url in errors) { if (! (url in successes)) { print url; } } }'
